@@ -12,6 +12,7 @@
         <module>cloud-client</module>
         <module>cloud-common</module>
         <module>cloud-server</module>
+        <module>FirstTask</module>
     </modules>
 
     <properties>
