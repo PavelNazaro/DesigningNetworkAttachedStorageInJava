@@ -1,4 +1,63 @@
-<?import javafx.scene.layout.GridPane?>
-<GridPane fx:controller="com.geekbrains.cloud.storage.client.Controller"
-          xmlns:fx="http://javafx.com/fxml" alignment="center" hgap="10" vgap="10">
-</GridPane>
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="300.0" minWidth="300.0" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/10.0.2-internal" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.geekbrains.cloud.storage.client.Controller">
+   <MenuBar fx:id="menuBar">
+   <menus>
+      <Menu text="File">
+         <items>
+            <MenuItem onAction="#handleExitAction" text="Exit" />
+         </items>
+      </Menu>
+      <Menu text="Help">
+         <items>
+            <MenuItem text="About" />
+         </items>
+      </Menu>
+   </menus>
+   </MenuBar>
+   <StackPane VBox.vgrow="ALWAYS">
+      <BorderPane>
+         <center>
+            <VBox fx:id="authPanel" maxHeight="100.0" maxWidth="200.0" minHeight="100.0" minWidth="200.0">
+               <Label text="Login:" />
+               <TextField fx:id="loginField" maxWidth="200.0" minWidth="50.0" onAction="#sendAuth" prefWidth="200.0" promptText="Enter you login" text="login" />
+               <Label text="Password:" />
+               <PasswordField fx:id="passField" maxWidth="200.0" minWidth="50.0" onAction="#sendAuth" prefWidth="200.0" promptText="Enter you password" text="password" />
+               <Button fx:id="btnAuth" minWidth="80" onAction="#sendAuth" text="Enter" />
+            </VBox>
+         </center>
+      </BorderPane>
+      <HBox fx:id="mainPanel" visible="false" HBox.hgrow="ALWAYS">
+         <ListView fx:id="listClientFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListClients" prefHeight="200.0" prefWidth="250.0" HBox.hgrow="ALWAYS" />
+         <VBox minHeight="300.0" minWidth="100.0" prefHeight="200.0" prefWidth="100.0">
+            <Button fx:id="buttonRefreshAll" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonRefreshAll" prefHeight="52.0" prefWidth="100.0" text="Refresh all" textAlignment="CENTER" visible="false" wrapText="true">
+            </Button>
+            <Button fx:id="buttonSelectAll" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonSelectAll" prefWidth="100.0" text="Select all" textAlignment="CENTER" wrapText="true">
+               <VBox.margin>
+                  <Insets top="80.0" />
+               </VBox.margin>
+            </Button>
+            <Button fx:id="buttonCopy" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonCopy" prefWidth="100.0" text="Copy" textAlignment="CENTER" visible="false">
+               <VBox.margin>
+                  <Insets top="10.0" />
+               </VBox.margin>
+            </Button>
+            <Button fx:id="buttonMove" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonMove" prefWidth="100.0" text="Move" textAlignment="CENTER" visible="false">
+               <VBox.margin>
+                  <Insets top="10.0" />
+               </VBox.margin>
+            </Button>
+            <Button fx:id="buttonDelete" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonDelete" prefWidth="100.0" text="Delete files" textAlignment="CENTER" visible="false">
+               <VBox.margin>
+                  <Insets top="10.0" />
+               </VBox.margin>
+            </Button>
+         </VBox>
+         <ListView fx:id="listServerFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListServers" prefHeight="200.0" prefWidth="250.0" HBox.hgrow="ALWAYS" />
+      </HBox>
+   </StackPane>
+</VBox>
