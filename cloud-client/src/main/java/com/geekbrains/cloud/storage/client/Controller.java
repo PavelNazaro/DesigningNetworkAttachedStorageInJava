@@ -358,15 +358,6 @@ public class Controller implements Initializable, Closeable {
 
                 try {
                     in = new Scanner(socket.getInputStream());
-
-//                    logger.info("Has?: " + in.hasNext());
-//
-//                    byte by = in.nextByte();
-//                    logger.info("Byte: " + by);
-//
-//                    if (by != BYTE_OF_CONFIRM) {
-//                        logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!!!!!");
-//                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -387,38 +378,22 @@ public class Controller implements Initializable, Closeable {
             logger.info("File name: " + fileName);
 
             try {
+                Files.deleteIfExists(Paths.get(FOLDER_CLIENT_FILES_NAME + fileName));
                 BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(FOLDER_CLIENT_FILES_NAME + fileName));
                 BufferedInputStream bufferedInputStream = new BufferedInputStream(socket.getInputStream());
 
                 long fileLength = in.nextLong();
                 logger.info("Length file: " + fileLength);
 
-                long receivedFileLength = 0L;
                 if (fileLength != 0) {
-//                    byte[] bytes = new byte[(int) fileLength];
+                    bufferedOutputStream.write(bufferedInputStream.readNBytes((int) fileLength));
 
-//                    int count = bufferedInputStream.read(bytes);
-//                    System.out.println("Bytes: " + Arrays.toString(bytes));
-//                    System.out.println("Count: " + count);
-                    bufferedOutputStream.write(bufferedInputStream.readNBytes((int) (fileLength-1)));
-
-//                    while (fileLength >= receivedFileLength) {
-//                        byte by = in.nextByte();
-//                        bufferedOutputStream.write(by);
-//                        receivedFileLength++;
-//                        if (fileLength == receivedFileLength) {
-//                            logger.info("Last byte: " + by);
-//                            logger.info("File received");
-//                            break;
-//                        }
-//                    }
                     logger.info("File received");
 
                 } else {
                     logger.info("File is clear");
                 }
                 bufferedOutputStream.close();
-//                bufferedInputStream.close();
 
             } catch (IOException e) {
                 e.printStackTrace();

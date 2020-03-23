@@ -193,16 +193,6 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                                 }
                             });
 
-//                            buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-//                            buf.writeByte(BYTE_OF_CONFIRM);
-//                            ctx.channel().writeAndFlush(buf);
-//
-//                            Thread.sleep(100);
-//
-//                            buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-//                            buf.writeByte(BYTE_OF_CONFIRM);
-//                            ctx.channel().writeAndFlush(buf);
-
                             currentState = State.IDLE;
                             break;
                         }
@@ -295,23 +285,16 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
 
         channel.writeAndFlush(size);
 
-        byte[] bytes = new byte[(int) size];
-//        byte[] bytes = new byte[16*1024];
+//        byte[] bytes = new byte[(int) size];
+//
+//        int count = bis.read(bytes);
+//        System.out.println("Bytes: " + Arrays.toString(bytes));
+//        System.out.println("Count: " + count);
+//        channel.writeAndFlush(bytes);
 
-        int count = bis.read(bytes);
-        System.out.println("Bytes: " + Arrays.toString(bytes));
-        System.out.println("Count: " + count);
-//        for (byte b : bytes){
-//            buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-//            buf.writeByte(b);
-//            channel.writeAndFlush(buf);
-//        }
-        channel.writeAndFlush(bytes);
-//        buf = ByteBufAllocator.DEFAULT.directBuffer((int) size);
-//        buf.writeBytes(bytes);
-//        channel.writeAndFlush(buf);
+        channel.writeAndFlush(bis.readNBytes((int) size));
+        logger.info("Done");
 
-        logger.info("Last byte: " + bytes[bytes.length-1]);
         bis.close();
     }
 
