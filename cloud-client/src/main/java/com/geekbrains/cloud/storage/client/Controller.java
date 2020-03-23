@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Scanner;
@@ -353,11 +354,21 @@ public class Controller implements Initializable, Closeable {
                     getFile();
                 });
 
-                byte by = in.nextByte();
-                logger.info("Byte: " + by);
+                logger.info("Byte wait");
 
-                if (by != BYTE_OF_CONFIRM) {
-                    logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!!!!!");
+                try {
+                    in = new Scanner(socket.getInputStream());
+
+//                    logger.info("Has?: " + in.hasNext());
+//
+//                    byte by = in.nextByte();
+//                    logger.info("Byte: " + by);
+//
+//                    if (by != BYTE_OF_CONFIRM) {
+//                        logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!!!!!");
+//                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
             }
             logger.info("Files gets from server");
@@ -377,28 +388,38 @@ public class Controller implements Initializable, Closeable {
 
             try {
                 BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(FOLDER_CLIENT_FILES_NAME + fileName));
+                BufferedInputStream bufferedInputStream = new BufferedInputStream(socket.getInputStream());
 
                 long fileLength = in.nextLong();
                 logger.info("Length file: " + fileLength);
 
                 long receivedFileLength = 0L;
                 if (fileLength != 0) {
-                    while (fileLength >= receivedFileLength) {
-                        byte by = in.nextByte();
-                        bufferedOutputStream.write(by);
-                        receivedFileLength++;
-                        if (fileLength == receivedFileLength) {
-                            logger.info("Last byte: " + by);
-                            logger.info("File received");
-                            bufferedOutputStream.close();
-                            break;
-                        }
-                    }
+//                    byte[] bytes = new byte[(int) fileLength];
+
+//                    int count = bufferedInputStream.read(bytes);
+//                    System.out.println("Bytes: " + Arrays.toString(bytes));
+//                    System.out.println("Count: " + count);
+                    bufferedOutputStream.write(bufferedInputStream.readNBytes((int) (fileLength-1)));
+
+//                    while (fileLength >= receivedFileLength) {
+//                        byte by = in.nextByte();
+//                        bufferedOutputStream.write(by);
+//                        receivedFileLength++;
+//                        if (fileLength == receivedFileLength) {
+//                            logger.info("Last byte: " + by);
+//                            logger.info("File received");
+//                            break;
+//                        }
+//                    }
+                    logger.info("File received");
 
                 } else {
                     logger.info("File is clear");
                 }
                 bufferedOutputStream.close();
+//                bufferedInputStream.close();
+
             } catch (IOException e) {
                 e.printStackTrace();
             }

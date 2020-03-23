@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -192,9 +193,15 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                                 }
                             });
 
-                            buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-                            buf.writeByte(BYTE_OF_CONFIRM);
-                            ctx.channel().writeAndFlush(buf);
+//                            buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+//                            buf.writeByte(BYTE_OF_CONFIRM);
+//                            ctx.channel().writeAndFlush(buf);
+//
+//                            Thread.sleep(100);
+//
+//                            buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+//                            buf.writeByte(BYTE_OF_CONFIRM);
+//                            ctx.channel().writeAndFlush(buf);
 
                             currentState = State.IDLE;
                             break;
@@ -292,12 +299,17 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
 //        byte[] bytes = new byte[16*1024];
 
         int count = bis.read(bytes);
+        System.out.println("Bytes: " + Arrays.toString(bytes));
         System.out.println("Count: " + count);
-        for (byte b : bytes){
-            buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-            buf.writeByte(b);
-            channel.writeAndFlush(buf);
-        }
+//        for (byte b : bytes){
+//            buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+//            buf.writeByte(b);
+//            channel.writeAndFlush(buf);
+//        }
+        channel.writeAndFlush(bytes);
+//        buf = ByteBufAllocator.DEFAULT.directBuffer((int) size);
+//        buf.writeBytes(bytes);
+//        channel.writeAndFlush(buf);
 
         logger.info("Last byte: " + bytes[bytes.length-1]);
         bis.close();
