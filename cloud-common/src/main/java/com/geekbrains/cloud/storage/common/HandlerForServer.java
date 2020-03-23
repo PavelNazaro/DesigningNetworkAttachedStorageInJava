@@ -186,17 +186,16 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                                         copyFile(ctx, file, true);
                                     } else {
                                         deleteFile(file);
-                                        ctx.writeAndFlush(BYTE_OF_CONFIRM);
                                     }
                                 } catch (IOException e) {
                                     e.printStackTrace();
                                 }
                             });
-                            if (byteMemory != BYTE_OF_DELETE_FILE){
-                                buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-                                buf.writeByte(BYTE_OF_CONFIRM);
-                                ctx.channel().writeAndFlush(buf);
-                            }
+
+                            buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+                            buf.writeByte(BYTE_OF_CONFIRM);
+                            ctx.channel().writeAndFlush(buf);
+
                             currentState = State.IDLE;
                             break;
                         }
@@ -289,13 +288,18 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
 
         channel.writeAndFlush(size);
 
-        byte[] byteArray = new byte[1];
-        while ((bis.read(byteArray)) != -1){
+        byte[] bytes = new byte[(int) size];
+//        byte[] bytes = new byte[16*1024];
+
+        int count = bis.read(bytes);
+        System.out.println("Count: " + count);
+        for (byte b : bytes){
             buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-            buf.writeByte(byteArray[0]);
+            buf.writeByte(b);
             channel.writeAndFlush(buf);
         }
-        logger.info("Last byte: " + byteArray[0]);
+
+        logger.info("Last byte: " + bytes[bytes.length-1]);
         bis.close();
     }
 

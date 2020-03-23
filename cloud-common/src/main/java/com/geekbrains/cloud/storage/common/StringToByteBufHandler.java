@@ -18,7 +18,11 @@ public class StringToByteBufHandler extends ChannelOutboundHandlerAdapter {
         } else if (msg instanceof Long){
             str = String.valueOf(msg);
         } else if (msg instanceof Byte){
-            ctx.writeAndFlush(msg);
+            str = String.valueOf(msg);
+            byte[] arr = str.getBytes();
+            ByteBuf buf = ctx.alloc().buffer(arr.length);
+            buf.writeBytes(arr);
+            ctx.writeAndFlush(buf);
             return;
         }
 

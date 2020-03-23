@@ -66,6 +66,7 @@ public class Controller implements Initializable, Closeable {
     private Socket socket;
     private DataOutputStream out;
     private Scanner in;
+    private BufferedInputStream inputStream;
 
 
     private long time;
@@ -86,6 +87,7 @@ public class Controller implements Initializable, Closeable {
             socket = new Socket("localhost", 8189);
             out = new DataOutputStream(socket.getOutputStream());
             in = new Scanner(socket.getInputStream());
+            inputStream = new BufferedInputStream(socket.getInputStream());
 
         } catch (Exception e) {
             showAlert("Error!", "Connection to server refused!", "Restart server and try again!");
@@ -355,7 +357,7 @@ public class Controller implements Initializable, Closeable {
                 logger.info("Byte: " + by);
 
                 if (by != BYTE_OF_CONFIRM) {
-                    logger.info("Error in inner byte!!");
+                    logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!!!!!");
                 }
             }
             logger.info("Files gets from server");
@@ -373,13 +375,13 @@ public class Controller implements Initializable, Closeable {
             listServerFiles.getItems().add(fileName);
             logger.info("File name: " + fileName);
 
-            long receivedFileLength = 0L;
             try {
                 BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(FOLDER_CLIENT_FILES_NAME + fileName));
 
                 long fileLength = in.nextLong();
                 logger.info("Length file: " + fileLength);
 
+                long receivedFileLength = 0L;
                 if (fileLength != 0) {
                     while (fileLength >= receivedFileLength) {
                         byte by = in.nextByte();
@@ -392,10 +394,11 @@ public class Controller implements Initializable, Closeable {
                             break;
                         }
                     }
+
                 } else {
                     logger.info("File is clear");
-                    bufferedOutputStream.close();
                 }
+                bufferedOutputStream.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -468,6 +471,7 @@ public class Controller implements Initializable, Closeable {
     public void close() throws IOException {
         in.close();
         out.close();
+        inputStream.close();
         socket.close();
     }
 }
