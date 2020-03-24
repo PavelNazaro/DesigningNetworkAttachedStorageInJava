@@ -13,9 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class HandlerForServer extends ChannelInboundHandlerAdapter {
@@ -27,7 +25,8 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
         IDLE,
         NAME_LENGTH, NAME, FILE_LENGTH, FILE,
         GET_COUNT_FILES, GET_LENGTH_NAME_FILE, GET_NAME_FILE,
-        SEND_COUNT_FILES
+        SEND_COUNT_FILES,
+        SEND_CONFIRM
     }
     private static final List<Channel> channels = new ArrayList<>();
     private String clientName;
@@ -84,6 +83,9 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                 } else if (byteMemory == BYTE_OF_REFRESH){
                     logger.info("Refresh");
                     currentState = State.SEND_COUNT_FILES;
+                } else if (byteMemory == BYTE_OF_CONFIRM){
+                    logger.info("Confirm");
+                    currentState = State.SEND_CONFIRM;
                 } else {
                     logger.info("ERROR: Invalid first byte - " + byteMemory);
                     System.out.println("ERROR: Invalid first byte - " + byteMemory);
@@ -179,19 +181,35 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                         listOfNeedsFiles.add(new String(fileName, StandardCharsets.UTF_8));
                         countFiles--;
                         if (countFiles == 0) {
-                            listOfNeedsFiles.forEach(file -> {
-                                try {
-                                    if (byteMemory == BYTE_OF_COPY_FILE) {
-                                        copyFile(ctx, file, false);
-                                    } else if (byteMemory == BYTE_OF_MOVE_FILE) {
-                                        copyFile(ctx, file, true);
-                                    } else {
+
+                            if (byteMemory == BYTE_OF_DELETE_FILE) {
+                                listOfNeedsFiles.forEach(file -> {
+                                    try {
                                         deleteFile(file);
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
                                     }
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                }
-                            });
+                                });
+                                logger.info("Files delete");
+                                sendByteOfConfirm();
+                            } else {
+                                buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+                                buf.writeByte(BYTE_OF_SEND_FILE_FROM_SERVER);
+                                ctx.channel().writeAndFlush(buf);
+                                logger.info("Send byte");
+
+                                listOfNeedsFiles.forEach(file -> {
+                                    try {
+                                        if (byteMemory == BYTE_OF_COPY_FILE) {
+                                            copyFile(ctx, file, false);
+                                        } else {
+                                            copyFile(ctx, file, true);
+                                        }
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                });
+                            }
 
                             currentState = State.IDLE;
                             break;
@@ -215,27 +233,51 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                         .map(Path::toFile)
                         .map(File::getName)
                         .collect(Collectors.toList());
+                Map<String, Long> map = new HashMap<>();
 
-                buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-                buf.writeByte(BYTE_OF_CONFIRM);
-                ctx.channel().writeAndFlush(buf);
+                listOfFilesClient.forEach(file -> {
+                    long sizeFileName = 0;
+                    try {
+                        sizeFileName = Files.size(Paths.get(FOLDER_SERVER_FILES_NAME + file));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    map.put(file, sizeFileName);
+                });
+
+                sendByteOfConfirm();
 
                 buf = ByteBufAllocator.DEFAULT.directBuffer(1);
                 buf.writeByte(listOfFilesClient.size());
                 ctx.channel().writeAndFlush(buf);
 
-                listOfFilesClient.forEach(file -> {
+                map.forEach((file, length) -> {
                     ctx.channel().writeAndFlush(file);
+                    ctx.channel().writeAndFlush(length);
                 });
+//                listOfFilesClient.forEach(file -> {
+//                    ctx.channel().writeAndFlush(file);
+//                });
 
                 currentState = State.IDLE;
                 break;
+            }
+            if (currentState == State.SEND_CONFIRM){
+                sendByteOfConfirm();
             }
         }
         logger.info("Zero readable bytes, state: " + currentState);
         if (buf.readableBytes() == 0) {
             buf.release();
         }
+    }
+
+    private void sendByteOfConfirm() {
+        ByteBuf buf;
+        buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+        buf.writeByte(BYTE_OF_CONFIRM);
+        ctx.channel().writeAndFlush(buf);
+        currentState = State.IDLE;
     }
 
     private void copyFile(ChannelHandlerContext ctx, String file, boolean isDeleteAfterCopy) throws IOException {
@@ -272,28 +314,29 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
 
     private void sendFile(String fileName, Channel channel) throws IOException {
         Path path = Paths.get(fileName);
-        long size = Files.size(path);
+        long sizeFileName = Files.size(path);
 
         BufferedInputStream bis = new BufferedInputStream(new FileInputStream(fileName));
 
-        ByteBuf buf;
-        buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-        buf.writeByte(BYTE_OF_SEND_FILE_FROM_SERVER);
-        channel.writeAndFlush(buf);
+        if (sizeFileName != 0) {
 
-        channel.writeAndFlush(path.getFileName().toString());
+            byte[] bytes = new byte[(int) sizeFileName];
 
-        channel.writeAndFlush(size);
+            int count = bis.read(bytes);
+            System.out.println("Bytes: " + Arrays.toString(bytes));
+            System.out.println("Count: " + count);
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            channel.writeAndFlush(bytes);
 
-//        byte[] bytes = new byte[(int) size];
-//
-//        int count = bis.read(bytes);
-//        System.out.println("Bytes: " + Arrays.toString(bytes));
-//        System.out.println("Count: " + count);
-//        channel.writeAndFlush(bytes);
-
-        channel.writeAndFlush(bis.readNBytes((int) size));
-        logger.info("Done");
+//        channel.writeAndFlush(bis.readNBytes((int) size));
+            logger.info("Done");
+        } else {
+            logger.info("File is clear");
+        }
 
         bis.close();
     }

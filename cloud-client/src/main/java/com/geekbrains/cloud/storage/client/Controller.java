@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 
 public class Controller implements Initializable, Closeable {
 
+    public static final int BYTES = 1024*32;
+
     public static final byte BYTE_OF_CONFIRM = 18;
     public static final byte BYTE_OF_AUTH_WRONG = 19;
     public static final byte BYTE_OF_AUTH_RIGHT = 20;
@@ -46,13 +48,15 @@ public class Controller implements Initializable, Closeable {
     @FXML private Button btnAuth;
     @FXML private TextField loginField;
 
-    @FXML private ListView<String> listClientFiles;
     @FXML private Button buttonMove;
     @FXML private Button buttonRefreshAll;
     @FXML private Button buttonCopy;
     @FXML private Button buttonDelete;
     @FXML private Button buttonSelectAll;
+    @FXML private ListView<String> listClientFiles;
     @FXML private ListView<String> listServerFiles;
+    @FXML private ListView<Long> listSizeClientFiles;
+    @FXML private ListView<Long> listSizeServerFiles;
 
     private final String FOLDER_CLIENT_FILES_NAME = "Client Files/";
     private CountDownLatch latchNetworkStarter;
@@ -67,7 +71,6 @@ public class Controller implements Initializable, Closeable {
     private Socket socket;
     private DataOutputStream out;
     private Scanner in;
-    private BufferedInputStream inputStream;
 
 
     private long time;
@@ -88,7 +91,6 @@ public class Controller implements Initializable, Closeable {
             socket = new Socket("localhost", 8189);
             out = new DataOutputStream(socket.getOutputStream());
             in = new Scanner(socket.getInputStream());
-            inputStream = new BufferedInputStream(socket.getInputStream());
 
         } catch (Exception e) {
             showAlert("Error!", "Connection to server refused!", "Restart server and try again!");
@@ -158,6 +160,8 @@ public class Controller implements Initializable, Closeable {
     private void refreshAll() {
         listServerFiles.getItems().clear();
         listClientFiles.getItems().clear();
+        listSizeClientFiles.getItems().clear();
+        listSizeServerFiles.getItems().clear();
 
         try {
             refreshListOfClientFiles();
@@ -188,6 +192,8 @@ public class Controller implements Initializable, Closeable {
             while (countFiles != 0){
                 String str = in.next();
                 listServerFiles.getItems().add(str);
+                long size = in.nextLong();
+                listSizeServerFiles.getItems().add(size);
                 logger.info("File name: " + str);
                 countFiles--;
             }
@@ -207,6 +213,15 @@ public class Controller implements Initializable, Closeable {
                         .map(File::getName)
                         .collect(Collectors.toList());
                 listClientFiles.getItems().addAll(listOfFilesClientFiles);
+                listOfFilesClientFiles.forEach(file -> {
+                    long sizeFileName = 0;
+                    try {
+                        sizeFileName = Files.size(Paths.get(FOLDER_CLIENT_FILES_NAME + file));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    listSizeClientFiles.getItems().add(sizeFileName);
+                });
             } else {
                 Files.createDirectories(path);
             }
@@ -240,7 +255,7 @@ public class Controller implements Initializable, Closeable {
                 getListOfSelectedAndAction(operation);
             } else {
                 logger.info(operation + " from server");
-                sendListToGetFromServer(byteOfOperation);
+                sendListToGetOrDeleteFromServer(byteOfOperation);
             }
         }
         logger.info("----------Seconds----------");
@@ -325,7 +340,7 @@ public class Controller implements Initializable, Closeable {
         bis.close();
     }
 
-    private void sendListToGetFromServer(byte byteOfOperation){
+    private void sendListToGetOrDeleteFromServer(byte byteOfOperation){
         int countNeedsFilesFromServer = listServerFiles.getSelectionModel().getSelectedItems().size();
         if (countNeedsFilesFromServer != 0) {
             logger.info("Send list of need to server");
@@ -350,56 +365,101 @@ public class Controller implements Initializable, Closeable {
 
             if (byteOfOperation != BYTE_OF_DELETE_FILE) {
 
-                listServerFiles.getSelectionModel().getSelectedItems().forEach(fileName -> {
-                    getFile();
-                });
-
                 logger.info("Byte wait");
+                byte b = in.nextByte();
+                logger.info("Byte: " + b);
+
+                if (b == BYTE_OF_SEND_FILE_FROM_SERVER) {
+                    int id = 0;
+                    List<Integer> ints = listServerFiles.getSelectionModel().getSelectedIndices();
+                    for (String fileName : listServerFiles.getSelectionModel().getSelectedItems()) {
+                        getFile(fileName, listSizeServerFiles.getItems().get(ints.get(id++)));
+                    }
+                } else {
+                    logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
+                }
 
                 try {
                     in = new Scanner(socket.getInputStream());
-                } catch (IOException e) {
+                    out.writeByte(BYTE_OF_CONFIRM);
+                    Thread.sleep(10);
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
+
+
+                logger.info("Files gets from server");
             }
-            logger.info("Files gets from server");
+
+            logger.info("Byte wait");
+            byte b = in.nextByte();
+            logger.info("Byte: " + b);
+            if (b != BYTE_OF_CONFIRM) {
+                logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
+            }
         } else {
             showAlert("Error!", "Nothing selected!", "Please select any file!");
         }
     }
 
-    private void getFile() {
-        byte b = in.nextByte();
-        logger.info("Byte: " + b);
-        if (b == BYTE_OF_SEND_FILE_FROM_SERVER) {
+    private void getFile(String fileName, long sizeFileName) {
+        logger.info("File name: " + fileName);
+        logger.info("Length file: " + sizeFileName);
 
-            String fileName = in.next();
-            listServerFiles.getItems().add(fileName);
-            logger.info("File name: " + fileName);
+        try {
+            BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(FOLDER_CLIENT_FILES_NAME + fileName));
+            BufferedInputStream bufferedInputStream = new BufferedInputStream(socket.getInputStream());
 
-            try {
-                Files.deleteIfExists(Paths.get(FOLDER_CLIENT_FILES_NAME + fileName));
-                BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(FOLDER_CLIENT_FILES_NAME + fileName));
-                BufferedInputStream bufferedInputStream = new BufferedInputStream(socket.getInputStream());
+//            while (bufferedInputStream.available() < sizeFileName) {
+//                System.out.println("Ava:" + bufferedInputStream.available());
+//                try {
+//                    Thread.sleep(10);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//            System.out.println("Ava:" + bufferedInputStream.available());
 
-                long fileLength = in.nextLong();
-                logger.info("Length file: " + fileLength);
+            if (sizeFileName != 0) {
+                byte[] bytes;
+                logger.info("here");
 
-                if (fileLength != 0) {
-                    bufferedOutputStream.write(bufferedInputStream.readNBytes((int) fileLength));
+                long leftBytes = 0;
+                while (sizeFileName > leftBytes) {
+                    int available = bufferedInputStream.available();
+                    if (available == 0){
+                        try {
+                            Thread.sleep(10);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        continue;
+                    }
+                    if (available < BYTES){
+                        bytes = new byte[available];
+                        leftBytes += available;
+                    } else {
+                        bytes = new byte[BYTES];
+                        leftBytes += BYTES;
+                    }
 
-                    logger.info("File received");
-
-                } else {
-                    logger.info("File is clear");
+                    int count = bufferedInputStream.read(bytes);
+//                    System.out.println("Bytes: " + Arrays.toString(bytes));
+                    System.out.println("Count: " + count);
+                    bufferedOutputStream.write(bytes);
                 }
-                bufferedOutputStream.close();
+                System.out.println("Left: " + leftBytes);
 
-            } catch (IOException e) {
-                e.printStackTrace();
+//                    bufferedOutputStream.write(bufferedInputStream.readNBytes((int) sizeFileName));
+
+                logger.info("File received");
+            } else {
+                logger.info("File is clear");
             }
-        } else {
-            logger.info("Error in inner byte!!");
+            bufferedOutputStream.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -467,7 +527,6 @@ public class Controller implements Initializable, Closeable {
     public void close() throws IOException {
         in.close();
         out.close();
-        inputStream.close();
         socket.close();
     }
 }

@@ -19,6 +19,7 @@ public class StringToByteBufHandler extends ChannelOutboundHandlerAdapter {
             System.out.println("ByteBuf str: " + str);
         } else if (msg instanceof Long){
             str = String.valueOf(msg);
+            System.out.println("Long: " + str);
         } else if (msg instanceof Byte){
             System.out.println("Byte: " + msg);
             str = String.valueOf(msg);

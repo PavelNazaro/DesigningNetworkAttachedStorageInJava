@@ -33,6 +33,7 @@
       </BorderPane>
       <HBox fx:id="mainPanel" visible="false" HBox.hgrow="ALWAYS">
          <ListView fx:id="listClientFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListClients" prefHeight="200.0" prefWidth="250.0" HBox.hgrow="ALWAYS" />
+         <ListView fx:id="listSizeClientFiles" minHeight="300.0" minWidth="70.0" prefHeight="200.0" prefWidth="70.0" maxWidth="100" HBox.hgrow="ALWAYS" />
          <VBox minHeight="300.0" minWidth="100.0" prefHeight="200.0" prefWidth="100.0">
             <Button fx:id="buttonRefreshAll" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonRefreshAll" prefHeight="52.0" prefWidth="100.0" text="Refresh all" textAlignment="CENTER" visible="false" wrapText="true">
             </Button>
@@ -58,6 +59,7 @@
             </Button>
          </VBox>
          <ListView fx:id="listServerFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListServers" prefHeight="200.0" prefWidth="250.0" HBox.hgrow="ALWAYS" />
+         <ListView fx:id="listSizeServerFiles" minHeight="300.0" minWidth="70.0" prefHeight="200.0" prefWidth="70.0" maxWidth="100"  HBox.hgrow="ALWAYS" />
       </HBox>
    </StackPane>
 </VBox>
