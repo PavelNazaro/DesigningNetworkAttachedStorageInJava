@@ -3,6 +3,7 @@
 <?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
 
 <VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="300.0" minWidth="300.0" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/10.0.2-internal" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.geekbrains.cloud.storage.client.Controller">
    <MenuBar fx:id="menuBar">
@@ -20,46 +21,82 @@
    </menus>
    </MenuBar>
    <StackPane VBox.vgrow="ALWAYS">
-      <BorderPane>
+      <BorderPane fx:id="authPanel">
          <center>
-            <VBox fx:id="authPanel" maxHeight="100.0" maxWidth="200.0" minHeight="100.0" minWidth="200.0">
+            <VBox alignment="CENTER_LEFT" maxHeight="100.0" maxWidth="200.0" minHeight="100.0" minWidth="200.0">
+               <Label alignment="CENTER" maxWidth="200.0" minWidth="100.0" prefWidth="200.0" text="Authenticate">
+                  <font>
+                     <Font size="18.0" />
+                  </font></Label>
                <Label text="Login:" />
-               <TextField fx:id="loginField" maxWidth="200.0" minWidth="50.0" onAction="#sendAuth" prefWidth="200.0" promptText="Enter you login" text="login" />
+               <TextField fx:id="loginFieldAuth" maxWidth="200.0" minWidth="100.0" onAction="#pressButtonSignInAuth" prefWidth="200.0" promptText="Enter you login" text="login" />
                <Label text="Password:" />
-               <PasswordField fx:id="passField" maxWidth="200.0" minWidth="50.0" onAction="#sendAuth" prefWidth="200.0" promptText="Enter you password" text="password" />
-               <Button fx:id="btnAuth" minWidth="80" onAction="#sendAuth" text="Enter" />
+               <PasswordField fx:id="passFieldAuth" maxWidth="200.0" minWidth="100.0" onAction="#pressButtonSignInAuth" prefWidth="200.0" promptText="Enter you password" text="password" />
+               <Button fx:id="btnSignInAuth" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignInAuth" prefWidth="100.0" text="Sign In" />
+               <Label text="No account? Register:">
+                  <VBox.margin>
+                     <Insets top="20.0" />
+                  </VBox.margin>
+               </Label>
+               <Button fx:id="btnSignUpAuth" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignUpAuth" prefWidth="100.0" text="Sign Up" />
+            </VBox>
+         </center>
+      </BorderPane>
+      <BorderPane fx:id="signUpPanel" visible="false">
+         <center>
+            <VBox alignment="CENTER_LEFT" maxHeight="100.0" maxWidth="200.0" minHeight="100.0" minWidth="200.0">
+               <Label alignment="CENTER" maxWidth="200.0" minWidth="100.0" prefWidth="200.0" text="Add new user">
+                  <font>
+                     <Font size="18.0" />
+                  </font></Label>
+               <Label text="Enter new login:" />
+               <TextField fx:id="loginFieldAdd" maxWidth="200.0" minWidth="100.0" onAction="#pressButtonSignUpAdd" prefWidth="200.0" />
+               <Label text="Enter password:" />
+               <PasswordField fx:id="passFieldAdd" maxWidth="200.0" minWidth="100.0" onAction="#pressButtonSignUpAdd" prefWidth="200.0" />
+               <Button fx:id="btnSignUpAdd" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignUpAdd" prefWidth="100.0" text="Sign Up" />
+               <Label text="Already have an account?">
+                  <VBox.margin>
+                     <Insets top="20.0" />
+                  </VBox.margin>
+               </Label>
+               <Button fx:id="btnSignInAdd" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignInAdd" prefWidth="100.0" text="Sign In" />
             </VBox>
          </center>
       </BorderPane>
       <HBox fx:id="mainPanel" visible="false" HBox.hgrow="ALWAYS">
          <ListView fx:id="listClientFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListClients" prefHeight="200.0" prefWidth="250.0" HBox.hgrow="ALWAYS" />
-         <ListView fx:id="listSizeClientFiles" minHeight="300.0" minWidth="70.0" prefHeight="200.0" prefWidth="70.0" maxWidth="100" HBox.hgrow="ALWAYS" />
+         <ListView fx:id="listSizeClientFiles" maxWidth="100" minHeight="300.0" onMouseClicked="#mouseClickedListsBytes" minWidth="70.0" prefHeight="200.0" prefWidth="70.0" HBox.hgrow="ALWAYS" />
          <VBox minHeight="300.0" minWidth="100.0" prefHeight="200.0" prefWidth="100.0">
-            <Button fx:id="buttonRefreshAll" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonRefreshAll" prefHeight="52.0" prefWidth="100.0" text="Refresh all" textAlignment="CENTER" visible="false" wrapText="true">
+            <Button fx:id="buttonRefreshAll" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonRefreshAll" prefHeight="52.0" prefWidth="100.0" text="Refresh all" textAlignment="CENTER" wrapText="true">
             </Button>
             <Button fx:id="buttonSelectAll" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonSelectAll" prefWidth="100.0" text="Select all" textAlignment="CENTER" wrapText="true">
                <VBox.margin>
                   <Insets top="80.0" />
                </VBox.margin>
             </Button>
-            <Button fx:id="buttonCopy" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonCopy" prefWidth="100.0" text="Copy" textAlignment="CENTER" visible="false">
+            <Button fx:id="buttonCopy" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonCopy" prefWidth="100.0" text="Copy" textAlignment="CENTER">
                <VBox.margin>
                   <Insets top="10.0" />
                </VBox.margin>
             </Button>
-            <Button fx:id="buttonMove" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonMove" prefWidth="100.0" text="Move" textAlignment="CENTER" visible="false">
+            <Button fx:id="buttonMove" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonMove" prefWidth="100.0" text="Move" textAlignment="CENTER">
                <VBox.margin>
                   <Insets top="10.0" />
                </VBox.margin>
             </Button>
-            <Button fx:id="buttonDelete" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonDelete" prefWidth="100.0" text="Delete files" textAlignment="CENTER" visible="false">
+            <Button fx:id="buttonDelete" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonDelete" prefWidth="100.0" text="Delete" textAlignment="CENTER">
+               <VBox.margin>
+                  <Insets top="10.0" />
+               </VBox.margin>
+            </Button>
+            <Button fx:id="buttonRename" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonRename" prefWidth="100.0" text="Rename" textAlignment="CENTER">
                <VBox.margin>
                   <Insets top="10.0" />
                </VBox.margin>
             </Button>
          </VBox>
          <ListView fx:id="listServerFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListServers" prefHeight="200.0" prefWidth="250.0" HBox.hgrow="ALWAYS" />
-         <ListView fx:id="listSizeServerFiles" minHeight="300.0" minWidth="70.0" prefHeight="200.0" prefWidth="70.0" maxWidth="100"  HBox.hgrow="ALWAYS" />
+         <ListView fx:id="listSizeServerFiles" maxWidth="100" minHeight="300.0" onMouseClicked="#mouseClickedListsBytes" minWidth="70.0" prefHeight="200.0" prefWidth="70.0" HBox.hgrow="ALWAYS" />
       </HBox>
    </StackPane>
 </VBox>
