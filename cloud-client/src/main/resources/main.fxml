@@ -18,7 +18,7 @@
          <MenuItem onAction="#handleExitAction" text="Exit" />
       </Menu>
       <Menu text="Help">
-         <MenuItem text="About" />
+         <MenuItem onAction="#handleAboutAction" text="About" />
       </Menu>
    </MenuBar>
    <StackPane VBox.vgrow="ALWAYS">
@@ -65,9 +65,15 @@
          </center>
       </BorderPane>
       <HBox fx:id="mainPanel" visible="false" HBox.hgrow="ALWAYS">
-         <ListView fx:id="listClientFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListClients" prefHeight="200.0" prefWidth="250.0" HBox.hgrow="ALWAYS" />
-         <ListView fx:id="listSizeClientFiles" maxWidth="100" minHeight="300.0" minWidth="70.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="70.0" HBox.hgrow="ALWAYS" />
-         <VBox minHeight="300.0" minWidth="100.0" prefHeight="200.0" prefWidth="100.0">
+         <VBox HBox.hgrow="ALWAYS">
+            <TextField text="Client files" alignment="CENTER" disable="true" minWidth="100.0" prefWidth="250.0" />
+            <ListView fx:id="listClientFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListClients" prefHeight="200.0" prefWidth="250.0" VBox.vgrow="ALWAYS"/>
+         </VBox>
+         <VBox HBox.hgrow="SOMETIMES">
+            <TextField text="Size, bytes" alignment="CENTER" disable="true" maxWidth="120" minWidth="80.0" prefWidth="80.0" />
+            <ListView fx:id="listSizeClientFiles" maxWidth="120" minHeight="300.0" minWidth="80.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="80.0" VBox.vgrow="ALWAYS" />
+         </VBox>
+         <VBox minHeight="300.0" minWidth="100.0" prefHeight="200.0" prefWidth="100.0" HBox.hgrow="NEVER">
             <Button fx:id="buttonRefreshAll" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonRefreshAll" prefHeight="52.0" prefWidth="100.0" text="Refresh all" textAlignment="CENTER" wrapText="true">
             </Button>
             <Button fx:id="buttonSelectAll" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonSelectAll" prefWidth="100.0" text="Select all" textAlignment="CENTER" wrapText="true">
@@ -96,8 +102,14 @@
                </VBox.margin>
             </Button>
          </VBox>
-         <ListView fx:id="listServerFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListServers" prefHeight="200.0" prefWidth="250.0" HBox.hgrow="ALWAYS" />
-         <ListView fx:id="listSizeServerFiles" maxWidth="100" minHeight="300.0" minWidth="70.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="70.0" HBox.hgrow="ALWAYS" />
+         <VBox HBox.hgrow="ALWAYS">
+            <TextField text="Client files" alignment="CENTER" disable="true" minWidth="100.0" prefWidth="250.0" />
+            <ListView fx:id="listServerFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListServers" prefHeight="200.0" prefWidth="250.0" VBox.vgrow="ALWAYS"/>
+         </VBox>
+         <VBox HBox.hgrow="SOMETIMES">
+            <TextField text="Size, bytes" alignment="CENTER" disable="true" maxWidth="120" minWidth="80.0" prefWidth="80.0" />
+            <ListView fx:id="listSizeServerFiles" maxWidth="120" minHeight="300.0" minWidth="80.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="80.0" VBox.vgrow="ALWAYS"/>
+         </VBox>
       </HBox>
    </StackPane>
 </VBox>

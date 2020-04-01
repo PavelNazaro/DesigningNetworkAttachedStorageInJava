@@ -1,7 +1,6 @@
 package com.geekbrains.cloud.storage.common;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -50,7 +49,6 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        this.ctx = ctx;
         ByteBuf buf = ((ByteBuf) msg);
         while (buf.readableBytes() > 0) {
             if (currentState == State.IDLE) {
@@ -191,16 +189,16 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                                     }
                                 });
                                 logger.info("Files delete");
-                                sendByteBuf(1, Bytes.BYTE_OF_CONFIRM.toByte());
+                                sendObjectToClient(Bytes.BYTE_OF_CONFIRM.toByte());
                             } else if (byteMemory == Bytes.BYTE_OF_RENAME_FILE.toByte()) {
                                 String file = listOfOperationOfFiles.get(0);
                                 String newFileName = listOfOperationOfFiles.get(1);
                                 Path path = Paths.get(folderServerFilesName + file);
                                 Files.move(path, path.resolveSibling(newFileName));
                                 logger.info("File rename: " + file + " to new name: " + newFileName);
-                                sendByteBuf(1, Bytes.BYTE_OF_CONFIRM.toByte());
+                                sendObjectToClient(Bytes.BYTE_OF_CONFIRM.toByte());
                             } else {
-                                sendByteBuf(1, Bytes.BYTE_OF_SEND_FILE_FROM_SERVER.toByte());
+                                sendObjectToClient(Bytes.BYTE_OF_SEND_FILE_FROM_SERVER.toByte());
                                 listOfOperationOfFiles.forEach(file -> {
                                     try {
                                         copyFile(ctx, file, byteMemory);
@@ -243,12 +241,14 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                     mapFileNameAndSize.put(file, sizeFileName);
                 });
 
-                sendByteBuf(1, Bytes.BYTE_OF_CONFIRM.toByte());
-                sendByteBuf(1, listOfFilesClient.size());
+                sendObjectToClient(Bytes.BYTE_OF_CONFIRM.toByte());
+                sendObjectToClient(listOfFilesClient.size());
 
-                mapFileNameAndSize.forEach((file, length) -> {
-                    ctx.channel().writeAndFlush(file);
-                    ctx.channel().writeAndFlush(length);
+                mapFileNameAndSize.forEach((file, lengthFile) -> {
+//                    ctx.channel().writeAndFlush(file);
+//                    ctx.channel().writeAndFlush(lengthFile);
+                    sendObjectToClient(file);
+                    sendObjectToClient(lengthFile);
                 });
 
                 currentState = State.IDLE;
@@ -258,7 +258,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             //------------------------------
             //Return byte of confirm from client
             if (currentState == State.SEND_CONFIRM){
-                sendByteBuf(1, Bytes.BYTE_OF_CONFIRM.toByte());
+                sendObjectToClient(Bytes.BYTE_OF_CONFIRM.toByte());
                 currentState = State.IDLE;
             }
         }
@@ -288,7 +288,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
 
         if (sendQueryFromDB(operation, login, password)){
             logger.info(operation + " OK");
-            sendByteBuf(1, byteOfRight);
+            sendObjectToClient(byteOfRight);
             if (operation.equals("Auth")) {
                 clients.add(clientId);
                 logger.info("Client id: " + clientId);
@@ -298,7 +298,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             }
         } else {
             logger.info(operation + " wrong. Close channel!");
-            sendByteBuf(1, byteOfWrong);
+            sendObjectToClient(byteOfWrong);
             ctx.channel().close();
         }
     }
@@ -355,12 +355,16 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             byte[] bytes = new byte[(int) sizeFileName];
             //noinspection ResultOfMethodCallIgnored
             bis.read(bytes);
+
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            channel.writeAndFlush(bytes);
+
+            ByteBuf buf = ctx.alloc().buffer(bytes.length);
+            buf.writeBytes(bytes);
+            ctx.writeAndFlush(buf);
             logger.info("File send");
         } else {
             logger.info("File is clear");
@@ -368,17 +372,19 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
         bis.close();
     }
 
-    private void sendByteBuf(int i, int byteOfSendFileFromServer) {
-        ByteBuf buf = ByteBufAllocator.DEFAULT.directBuffer(i);
-        buf.writeByte(byteOfSendFileFromServer);
-        ctx.channel().writeAndFlush(buf);
-        logger.info("Send byte");
+    private void sendObjectToClient(Object bytesToSend) {
+        byte[] arr = (bytesToSend + "\n").getBytes();
+        ByteBuf buf = ctx.alloc().buffer(arr.length);
+        buf.writeBytes(arr);
+        ctx.writeAndFlush(buf);
+        logger.info("Send byte: " + bytesToSend);
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx){
+        this.ctx = ctx;
         logger.info("New client connected...");
-        ctx.channel().writeAndFlush("Ok\n");
+        sendObjectToClient(Bytes.BYTE_OF_CONFIRM.toByte());
     }
 
     @Override

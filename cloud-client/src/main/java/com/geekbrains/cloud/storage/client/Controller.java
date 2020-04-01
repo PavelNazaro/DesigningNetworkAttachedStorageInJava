@@ -103,10 +103,10 @@ public class Controller implements Initializable, Closeable {
 
         if (connectToServer()){
             logger.info("Wait connect");
-            String x = in.nextLine();
+            byte x = in.nextByte();
             logger.info("Network: " + x);
 
-            if (x.equals("Ok")) {
+            if (x == Bytes.BYTE_OF_CONFIRM.toByte()) {
                 if (operation.equals("Auth")){
                     logger.info("Auth");
 
@@ -556,7 +556,8 @@ public class Controller implements Initializable, Closeable {
                         leftBytes += BYTES;
                     }
 
-                    int count = bufferedInputStream.read(bytes);
+                    //noinspection ResultOfMethodCallIgnored
+                    bufferedInputStream.read(bytes);
                     bufferedOutputStream.write(bytes);
                 }
                 logger.info("Left: " + leftBytes);
@@ -677,5 +678,10 @@ public class Controller implements Initializable, Closeable {
         in.close();
         out.close();
         socket.close();
+    }
+
+    @FXML
+    public void handleAboutAction(ActionEvent actionEvent) {
+        showAlert("About", "Create by PavelNazaro", "");
     }
 }

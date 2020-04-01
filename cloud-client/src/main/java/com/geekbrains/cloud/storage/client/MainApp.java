@@ -12,7 +12,7 @@ public class MainApp extends Application {
         Parent root = FXMLLoader.load(getClass().getResource("/main.fxml"));
         primaryStage.setTitle("Cloud storage");
         primaryStage.setScene(new Scene(root, 800, 400));
-        primaryStage.setMinWidth(300);
+        primaryStage.setMinWidth(460);
         primaryStage.setMinHeight(300);
         primaryStage.show();
     }

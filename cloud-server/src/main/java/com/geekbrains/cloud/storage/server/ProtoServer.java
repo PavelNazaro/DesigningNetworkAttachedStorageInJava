@@ -1,7 +1,6 @@
 package com.geekbrains.cloud.storage.server;
 
 import com.geekbrains.cloud.storage.common.HandlerForServer;
-import com.geekbrains.cloud.storage.common.StringToByteBufHandler;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -27,9 +26,9 @@ public class ProtoServer {
                     //Настройка конвеера (для каждого клиента свой
                     .childHandler(new ChannelInitializer<SocketChannel>() { // (4)
                         @Override
-                        public void initChannel(SocketChannel ch) throws Exception {
+                        public void initChannel(SocketChannel ch) {
                             //Добавляем "квадратик" конвеера
-                            ch.pipeline().addLast(new StringToByteBufHandler(), new HandlerForServer());
+                            ch.pipeline().addLast(new HandlerForServer());
                         }
                     });
                     //.childOption(ChannelOption.SO_KEEPALIVE, true);
