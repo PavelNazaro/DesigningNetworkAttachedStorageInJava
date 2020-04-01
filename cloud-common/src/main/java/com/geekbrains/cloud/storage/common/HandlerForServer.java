@@ -19,22 +19,6 @@ import java.util.stream.Collectors;
 
 public class HandlerForServer extends ChannelInboundHandlerAdapter {
 
-    public static final byte BYTE_OF_CONFIRM = 10;
-    public static final byte BYTE_OF_REFRESH = 11;
-    public static final byte BYTE_OF_NEW_USER = 12;
-    public static final byte BYTE_OF_NEW_USER_RIGHT = 13;
-    public static final byte BYTE_OF_NEW_USER_WRONG = 14;
-    public static final byte BYTE_OF_AUTH = 15;
-    public static final byte BYTE_OF_AUTH_RIGHT = 16;
-    public static final byte BYTE_OF_AUTH_WRONG = 17;
-    public static final byte BYTE_OF_COPY_FILE = 18;
-    public static final byte BYTE_OF_MOVE_FILE = 19;
-    public static final byte BYTE_OF_DELETE_FILE = 20;
-    public static final byte BYTE_OF_RENAME_FILE = 21;
-    public static final byte BYTE_OF_COUNT_OF_FILES = 22;
-    public static final byte BYTE_OF_SEND_FILE_FROM_SERVER = 23;
-    public static final byte BYTE_OF_SEND_FILE_FROM_CLIENT = 24;
-
     private static final Logger logger = (Logger) LogManager.getLogger(HandlerForServer.class);
 
     public enum State {
@@ -72,23 +56,23 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             if (currentState == State.IDLE) {
                 byteMemory = buf.readByte();
                 logger.info("Byte of: " + byteMemory);
-                if (byteMemory == BYTE_OF_SEND_FILE_FROM_CLIENT) {
+                if (byteMemory == Bytes.BYTE_OF_SEND_FILE_FROM_CLIENT.toByte()) {
                     logger.info("Send file from client");
                     currentState = State.NAME_LENGTH;
                     receivedFileLength = 0L;
-                } else if (byteMemory == BYTE_OF_AUTH ||
-                        byteMemory == BYTE_OF_NEW_USER ||
-                        byteMemory == BYTE_OF_COPY_FILE ||
-                        byteMemory == BYTE_OF_MOVE_FILE ||
-                        byteMemory == BYTE_OF_DELETE_FILE ||
-                        byteMemory == BYTE_OF_RENAME_FILE){
+                } else if (byteMemory == Bytes.BYTE_OF_AUTH.toByte() ||
+                        byteMemory == Bytes.BYTE_OF_NEW_USER.toByte() ||
+                        byteMemory == Bytes.BYTE_OF_COPY_FILE.toByte() ||
+                        byteMemory == Bytes.BYTE_OF_MOVE_FILE.toByte() ||
+                        byteMemory == Bytes.BYTE_OF_DELETE_FILE.toByte() ||
+                        byteMemory == Bytes.BYTE_OF_RENAME_FILE.toByte()){
                     logger.info("Auth, copy, move or delete");
                     listOfOperationOfFiles.clear();
                     currentState = State.GET_COUNT_FILES;
-                } else if (byteMemory == BYTE_OF_REFRESH){
+                } else if (byteMemory == Bytes.BYTE_OF_REFRESH.toByte()){
                     logger.info("Refresh");
                     currentState = State.SEND_COUNT_FILES;
-                } else if (byteMemory == BYTE_OF_CONFIRM){
+                } else if (byteMemory == Bytes.BYTE_OF_CONFIRM.toByte()){
                     logger.info("Confirm");
                     currentState = State.SEND_CONFIRM;
                 } else {
@@ -144,13 +128,13 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             }
 
             //------------------------------
-            // Auth, copy, move and delete:
+            // Auth, copy, move, delete or rename:
             if (currentState == State.GET_COUNT_FILES) {
                 if (buf.readableBytes() >= 1) {
                     countFiles = buf.readInt();
-                    if (byteMemory == BYTE_OF_AUTH){
+                    if (byteMemory == Bytes.BYTE_OF_AUTH.toByte()){
                         logger.info("Auth");
-                    } else if (byteMemory == BYTE_OF_NEW_USER){
+                    } else if (byteMemory == Bytes.BYTE_OF_NEW_USER.toByte()){
                         logger.info("New user");
                     } else {
                         logger.info("Copy, move, delete or rename");
@@ -180,16 +164,16 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                     String fileName = new String(bytesFileName, StandardCharsets.UTF_8);
                     logger.info("File name: " + fileName);
 
-                    if (byteMemory == BYTE_OF_AUTH){
+                    if (byteMemory == Bytes.BYTE_OF_AUTH.toByte()){
                         sendRequestToDataBase("Auth",
-                                BYTE_OF_AUTH_RIGHT, BYTE_OF_AUTH_WRONG,
+                                Bytes.BYTE_OF_AUTH_RIGHT.toByte(), Bytes.BYTE_OF_AUTH_WRONG.toByte(),
                                 fileName);
                         logger.info("Byte of Auth");
                         currentState = State.IDLE;
                         break;
-                    } else if (byteMemory == BYTE_OF_NEW_USER){
+                    } else if (byteMemory == Bytes.BYTE_OF_NEW_USER.toByte()){
                         sendRequestToDataBase("New user",
-                                BYTE_OF_NEW_USER_RIGHT, BYTE_OF_NEW_USER_WRONG,
+                                Bytes.BYTE_OF_NEW_USER_RIGHT.toByte(), Bytes.BYTE_OF_NEW_USER_WRONG.toByte(),
                                 fileName);
                         logger.info("Byte of new user");
                         currentState = State.IDLE;
@@ -198,7 +182,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                         listOfOperationOfFiles.add(fileName);
                         countFiles--;
                         if (countFiles == 0) {
-                            if (byteMemory == BYTE_OF_DELETE_FILE) {
+                            if (byteMemory == Bytes.BYTE_OF_DELETE_FILE.toByte()) {
                                 listOfOperationOfFiles.forEach(file -> {
                                     try {
                                         deleteFile(file);
@@ -207,16 +191,16 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                                     }
                                 });
                                 logger.info("Files delete");
-                                sendByteBuf(1, BYTE_OF_CONFIRM);
-                            } else if (byteMemory == BYTE_OF_RENAME_FILE) {
+                                sendByteBuf(1, Bytes.BYTE_OF_CONFIRM.toByte());
+                            } else if (byteMemory == Bytes.BYTE_OF_RENAME_FILE.toByte()) {
                                 String file = listOfOperationOfFiles.get(0);
                                 String newFileName = listOfOperationOfFiles.get(1);
                                 Path path = Paths.get(folderServerFilesName + file);
                                 Files.move(path, path.resolveSibling(newFileName));
                                 logger.info("File rename: " + file + " to new name: " + newFileName);
-                                sendByteBuf(1, BYTE_OF_CONFIRM);
+                                sendByteBuf(1, Bytes.BYTE_OF_CONFIRM.toByte());
                             } else {
-                                sendByteBuf(1, BYTE_OF_SEND_FILE_FROM_SERVER);
+                                sendByteBuf(1, Bytes.BYTE_OF_SEND_FILE_FROM_SERVER.toByte());
                                 listOfOperationOfFiles.forEach(file -> {
                                     try {
                                         copyFile(ctx, file, byteMemory);
@@ -238,7 +222,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             if (currentState == State.SEND_COUNT_FILES) {
                 logger.info("Send list of files from server");
                 Path path = Paths.get(folderServerFilesName);
-                if (!Files.exists(path)){
+                if (! Files.exists(path)){
                     Files.createDirectories(path);
                     logger.info("Create new directory");
                 }
@@ -259,7 +243,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                     mapFileNameAndSize.put(file, sizeFileName);
                 });
 
-                sendByteBuf(1, BYTE_OF_CONFIRM);
+                sendByteBuf(1, Bytes.BYTE_OF_CONFIRM.toByte());
                 sendByteBuf(1, listOfFilesClient.size());
 
                 mapFileNameAndSize.forEach((file, length) -> {
@@ -274,11 +258,10 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             //------------------------------
             //Return byte of confirm from client
             if (currentState == State.SEND_CONFIRM){
-                sendByteBuf(1, BYTE_OF_CONFIRM);
+                sendByteBuf(1, Bytes.BYTE_OF_CONFIRM.toByte());
                 currentState = State.IDLE;
             }
         }
-//        logger.info("Zero readable bytes, state: " + currentState);
         if (buf.readableBytes() == 0) {
             buf.release();
         }
@@ -286,7 +269,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
 
     private void copyFile(ChannelHandlerContext ctx, String file, byte byteMemory) throws IOException {
         sendFile(folderServerFilesName + file, ctx.channel());
-        if (byteMemory == BYTE_OF_MOVE_FILE) {
+        if (byteMemory == Bytes.BYTE_OF_MOVE_FILE.toByte()) {
             logger.info("File move: " + file);
             deleteFile(file);
         }
@@ -309,7 +292,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             if (operation.equals("Auth")) {
                 clients.add(clientId);
                 logger.info("Client id: " + clientId);
-                folderServerFilesName = "Server Files/Client_Id_" + clientId + "/";
+                folderServerFilesName = "Server Files/user" + clientId + "/";
             } else {
                 ctx.channel().close();
             }
@@ -353,7 +336,6 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             e.printStackTrace();
         }
 
-        //if insert -> true
         return result > 0;
     }
 
@@ -371,7 +353,8 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
         if (sizeFileName != 0) {
             logger.info("Sending file...");
             byte[] bytes = new byte[(int) sizeFileName];
-            int count = bis.read(bytes);
+            //noinspection ResultOfMethodCallIgnored
+            bis.read(bytes);
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
@@ -399,7 +382,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+    public void channelInactive(ChannelHandlerContext ctx) {
         if (clients.size() > 0) {
             clients.remove(Integer.valueOf(clientId));
             logger.info(String.format("Client '%s' disconnected...\n", clientId));
@@ -409,7 +392,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         cause.printStackTrace();
         ctx.close();
     }

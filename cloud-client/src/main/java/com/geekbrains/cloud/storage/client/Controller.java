@@ -1,5 +1,6 @@
 package com.geekbrains.cloud.storage.client;
 
+import com.geekbrains.cloud.storage.common.Bytes;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -27,23 +28,7 @@ import java.util.stream.Collectors;
 
 public class Controller implements Initializable, Closeable {
 
-    public static final byte BYTE_OF_CONFIRM = 10;
-    public static final byte BYTE_OF_REFRESH = 11;
-    public static final byte BYTE_OF_NEW_USER = 12;
-    public static final byte BYTE_OF_NEW_USER_RIGHT = 13;
-    public static final byte BYTE_OF_NEW_USER_WRONG = 14;
-    public static final byte BYTE_OF_AUTH = 15;
-    public static final byte BYTE_OF_AUTH_RIGHT = 16;
-    public static final byte BYTE_OF_AUTH_WRONG = 17;
-    public static final byte BYTE_OF_COPY_FILE = 18;
-    public static final byte BYTE_OF_MOVE_FILE = 19;
-    public static final byte BYTE_OF_DELETE_FILE = 20;
-    public static final byte BYTE_OF_RENAME_FILE = 21;
-    public static final byte BYTE_OF_COUNT_OF_FILES = 22;
-    public static final byte BYTE_OF_SEND_FILE_FROM_SERVER = 23;
-    public static final byte BYTE_OF_SEND_FILE_FROM_CLIENT = 24;
-
-    public static final int BYTES = 1024*32;
+    private static final int BYTES = 1024*32;
     private static final Logger logger = (Logger) LogManager.getLogger(Controller.class);
     private static final String FOLDER_CLIENT_FILES_NAME = "Client Files/";
 
@@ -56,6 +41,7 @@ public class Controller implements Initializable, Closeable {
     private DataOutputStream out;
     private Scanner in;
 
+    @FXML private MenuBar menuBar;
     @FXML private HBox mainPanel;
     @FXML private BorderPane authPanel;
     @FXML private BorderPane signUpPanel;
@@ -99,7 +85,7 @@ public class Controller implements Initializable, Closeable {
                 if (operation.equals("Auth")){
                     logger.info("Auth");
 
-                    if (requestToServer(BYTE_OF_AUTH, login, password) == BYTE_OF_AUTH_RIGHT){
+                    if (requestToServer(Bytes.BYTE_OF_AUTH.toByte(), login, password) == Bytes.BYTE_OF_AUTH_RIGHT.toByte()){
                         authRight();
                         return;
                     } else {
@@ -108,7 +94,7 @@ public class Controller implements Initializable, Closeable {
                 } else {
                     logger.info("New user");
 
-                    if (requestToServer(BYTE_OF_NEW_USER, login, password) == BYTE_OF_NEW_USER_RIGHT){
+                    if (requestToServer(Bytes.BYTE_OF_NEW_USER.toByte(), login, password) == Bytes.BYTE_OF_NEW_USER_RIGHT.toByte()){
                         newUserRight();
                     } else {
                         newUserWrong();
@@ -221,11 +207,11 @@ public class Controller implements Initializable, Closeable {
 
     private void refreshListOfServerFiles() throws IOException {
         logger.info("Send byte refresh");
-        out.writeByte(BYTE_OF_REFRESH);
+        out.writeByte(Bytes.BYTE_OF_REFRESH.toByte());
 
         byte b = in.nextByte();
         logger.info("Byte: " + b);
-        if (b == BYTE_OF_CONFIRM) {
+        if (b == Bytes.BYTE_OF_CONFIRM.toByte()) {
             int countFiles = in.nextInt();
             logger.info("Count of files: " + countFiles);
 
@@ -274,22 +260,22 @@ public class Controller implements Initializable, Closeable {
 
     @FXML
     public void pressButtonCopy(ActionEvent actionEvent) {
-        doCopyMoveDeleteRename("Copy", BYTE_OF_COPY_FILE);
+        doCopyMoveDeleteRename("Copy", Bytes.BYTE_OF_COPY_FILE.toByte());
     }
 
     @FXML
     public void pressButtonMove(ActionEvent actionEvent) {
-        doCopyMoveDeleteRename("Move", BYTE_OF_MOVE_FILE);
+        doCopyMoveDeleteRename("Move", Bytes.BYTE_OF_MOVE_FILE.toByte());
     }
 
     @FXML
     public void pressButtonDelete(ActionEvent actionEvent) {
-        doCopyMoveDeleteRename("Delete", BYTE_OF_DELETE_FILE);
+        doCopyMoveDeleteRename("Delete", Bytes.BYTE_OF_DELETE_FILE.toByte());
     }
 
     @FXML
     public void pressButtonRename(ActionEvent actionEvent) {
-        doCopyMoveDeleteRename("Rename", BYTE_OF_RENAME_FILE);
+        doCopyMoveDeleteRename("Rename", Bytes.BYTE_OF_RENAME_FILE.toByte());
     }
 
     private void doCopyMoveDeleteRename(String operation, byte byteOfOperation) {
@@ -393,7 +379,7 @@ public class Controller implements Initializable, Closeable {
 
         BufferedInputStream bis = new BufferedInputStream(new FileInputStream(fileName));
 
-        out.writeByte(BYTE_OF_SEND_FILE_FROM_CLIENT);
+        out.writeByte(Bytes.BYTE_OF_SEND_FILE_FROM_CLIENT.toByte());
 
         int length = path.getFileName().toString().length();
         out.writeInt(length);
@@ -418,7 +404,7 @@ public class Controller implements Initializable, Closeable {
     private void sendListToGetOrDeleteFromServer(byte byteOfOperation){
         int countNeedsFilesFromServer = listServerFiles.getSelectionModel().getSelectedItems().size();
         if (countNeedsFilesFromServer != 0) {
-            if (byteOfOperation == BYTE_OF_RENAME_FILE) {
+            if (byteOfOperation == Bytes.BYTE_OF_RENAME_FILE.toByte()) {
                 if (countNeedsFilesFromServer == 1) {
                     try {
                         String fileName = listServerFiles.getSelectionModel().getSelectedItem();
@@ -469,13 +455,13 @@ public class Controller implements Initializable, Closeable {
                 });
                 logger.info("Operation send to server");
 
-                if (byteOfOperation != BYTE_OF_DELETE_FILE) {
+                if (byteOfOperation != Bytes.BYTE_OF_DELETE_FILE.toByte()) {
 
                     logger.info("Byte wait");
                     byte b = in.nextByte();
                     logger.info("Byte: " + b);
 
-                    if (b == BYTE_OF_SEND_FILE_FROM_SERVER) {
+                    if (b == Bytes.BYTE_OF_SEND_FILE_FROM_SERVER.toByte()) {
                         int id = 0;
                         List<Integer> ints = listServerFiles.getSelectionModel().getSelectedIndices();
                         for (String fileName : listServerFiles.getSelectionModel().getSelectedItems()) {
@@ -487,7 +473,7 @@ public class Controller implements Initializable, Closeable {
 
                     try {
                         in = new Scanner(socket.getInputStream());
-                        out.writeByte(BYTE_OF_CONFIRM);
+                        out.writeByte(Bytes.BYTE_OF_CONFIRM.toByte());
                         Thread.sleep(10);
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -504,7 +490,7 @@ public class Controller implements Initializable, Closeable {
         logger.info("Byte wait");
         byte b = in.nextByte();
         logger.info("Byte: " + b);
-        if (b != BYTE_OF_CONFIRM) {
+        if (b != Bytes.BYTE_OF_CONFIRM.toByte()) {
             logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
         }
     }
@@ -615,6 +601,8 @@ public class Controller implements Initializable, Closeable {
 
     @FXML
     public void pressButtonSignInAdd(ActionEvent actionEvent) {
+        loginFieldAuth.clear();
+        passFieldAuth.clear();
         signUpPanel.setVisible(false);
         authPanel.setVisible(true);
     }
@@ -632,6 +620,8 @@ public class Controller implements Initializable, Closeable {
 
     @FXML
     public void pressButtonSignUpAuth(ActionEvent actionEvent) {
+        loginFieldAdd.clear();
+        passFieldAdd.clear();
         authPanel.setVisible(false);
         signUpPanel.setVisible(true);
     }
