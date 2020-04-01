@@ -4,9 +4,11 @@ import com.geekbrains.cloud.storage.common.Bytes;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
+import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -71,6 +73,29 @@ public class Controller implements Initializable, Closeable {
         lagsSelectionModel.setSelectionMode(SelectionMode.MULTIPLE);
         lagsSelectionModel = listServerFiles.getSelectionModel();
         lagsSelectionModel.setSelectionMode(SelectionMode.MULTIPLE);
+
+        ContextMenu contextMenu = new ContextMenu();
+        MenuItem refreshAll = new MenuItem("Refresh all");
+        refreshAll.setOnAction(this::pressButtonRefreshAll);
+        contextMenu.getItems().add(refreshAll);
+        MenuItem selectAll = new MenuItem("Select all");
+        selectAll.setOnAction(this::pressButtonSelectAll);
+        contextMenu.getItems().add(selectAll);
+        MenuItem copy = new MenuItem("Copy");
+        copy.setOnAction(this::pressButtonCopy);
+        contextMenu.getItems().add(copy);
+        MenuItem move = new MenuItem("Move");
+        move.setOnAction(this::pressButtonMove);
+        contextMenu.getItems().add(move);
+        MenuItem delete = new MenuItem("Delete");
+        delete.setOnAction(this::pressButtonDelete);
+        contextMenu.getItems().add(delete);
+        MenuItem rename = new MenuItem("Rename");
+        rename.setOnAction(this::pressButtonRename);
+        contextMenu.getItems().add(rename);
+
+        listClientFiles.setContextMenu(contextMenu);
+        listServerFiles.setContextMenu(contextMenu);
     }
 
     private void connectToServer(String operation, String login, String password) {
@@ -179,35 +204,23 @@ public class Controller implements Initializable, Closeable {
     }
 
     private void refreshAll() {
-        listServerFiles.getItems().clear();
-        listClientFiles.getItems().clear();
-        listSizeClientFiles.getItems().clear();
-        listSizeServerFiles.getItems().clear();
-
-        try {
-            refreshListOfClientFiles();
-            refreshListOfServerFiles();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        if (listServerFiles.getItems().size() == 0){
-            listServerFiles.getItems().add("Empty");
-        }
-        if (listClientFiles.getItems().size() == 0){
-            listClientFiles.getItems().add("Empty");
-        }
-
-        if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
-            setListsViewClear();
-        }
+        refreshListOfClientFiles();
+        refreshListOfServerFiles();
 
         logger.info("Refresh all done");
         logger.info("__________________________");
     }
 
-    private void refreshListOfServerFiles() throws IOException {
+    private void refreshListOfServerFiles() {
+        listServerFiles.getItems().clear();
+        listSizeServerFiles.getItems().clear();
+
         logger.info("Send byte refresh");
-        out.writeByte(Bytes.BYTE_OF_REFRESH.toByte());
+        try {
+            out.writeByte(Bytes.BYTE_OF_REFRESH.toByte());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         byte b = in.nextByte();
         logger.info("Byte: " + b);
@@ -223,13 +236,23 @@ public class Controller implements Initializable, Closeable {
                 logger.info("File name: " + str);
                 countFiles--;
             }
-            logger.info("Refresh list servers");
+            logger.info("Refresh list servers done");
         } else {
             logger.info("Error in inner byte!!");
+        }
+        if (listServerFiles.getItems().size() == 0){
+            listServerFiles.getItems().add("Empty");
+        }
+
+        if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
+            setListsViewClear();
         }
     }
 
     private void refreshListOfClientFiles() {
+        listClientFiles.getItems().clear();
+        listSizeClientFiles.getItems().clear();
+
         try {
             Path path = Paths.get(FOLDER_CLIENT_FILES_NAME);
             if (Files.exists(path)){
@@ -252,10 +275,18 @@ public class Controller implements Initializable, Closeable {
                 Files.createDirectories(path);
             }
 
+            logger.info("Refresh list clients done");
         } catch (IOException e) {
             e.printStackTrace();
         }
-        logger.info("Refresh list clients");
+
+        if (listClientFiles.getItems().size() == 0){
+            listClientFiles.getItems().add("Empty");
+        }
+
+        if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
+            setListsViewClear();
+        }
     }
 
     @FXML
