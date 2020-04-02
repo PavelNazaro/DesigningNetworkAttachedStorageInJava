@@ -4,14 +4,13 @@ import com.geekbrains.cloud.storage.common.Bytes;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
-import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.stage.Stage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 
@@ -32,16 +31,21 @@ public class Controller implements Initializable, Closeable {
 
     private static final int BYTES = 1024*32;
     private static final Logger logger = (Logger) LogManager.getLogger(Controller.class);
-    private static final String FOLDER_CLIENT_FILES_NAME = "Client Files/";
 
     private enum Selected{
         CLEAR, LEFT, RIGHT
     }
     private Selected selected = Selected.CLEAR;
 
+    private int clientId = 0;
+    private String folderClientFilesName;
+    private static final String FOLDER_CLIENT_FILES_NAME = "Client Files/";
+
     private Socket socket;
     private DataOutputStream out;
     private Scanner in;
+
+    Stage stage;
 
     @FXML private MenuBar menuBar;
     @FXML private HBox mainPanel;
@@ -51,27 +55,27 @@ public class Controller implements Initializable, Closeable {
     @FXML private TextField loginFieldAuth;
     @FXML private PasswordField passFieldAdd;
     @FXML private PasswordField passFieldAuth;
-    @FXML private Button btnSignInAdd;
-    @FXML private Button btnSignInAuth;
-    @FXML private Button btnSignUpAdd;
-    @FXML private Button btnSignUpAuth;
+    @FXML private Button buttonSignInAdd;
+    @FXML private Button buttonSignInAuth;
+    @FXML private Button buttonSignUpAdd;
+    @FXML private Button buttonSignUpAuth;
     @FXML private Button buttonRefreshAll;
     @FXML private Button buttonSelectAll;
     @FXML private Button buttonCopy;
     @FXML private Button buttonMove;
     @FXML private Button buttonDelete;
     @FXML private Button buttonRename;
-    @FXML private ListView<String> listClientFiles;
-    @FXML private ListView<String> listServerFiles;
-    @FXML private ListView<Long> listSizeClientFiles;
-    @FXML private ListView<Long> listSizeServerFiles;
+    @FXML private ListView<String> listViewOfClientFiles;
+    @FXML private ListView<String> listViewOfServerFiles;
+    @FXML private ListView<Long> listViewOfSizeClientFiles;
+    @FXML private ListView<Long> listViewOfSizeServerFiles;
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         MultipleSelectionModel<String> lagsSelectionModel;
-        lagsSelectionModel = listClientFiles.getSelectionModel();
+        lagsSelectionModel = listViewOfClientFiles.getSelectionModel();
         lagsSelectionModel.setSelectionMode(SelectionMode.MULTIPLE);
-        lagsSelectionModel = listServerFiles.getSelectionModel();
+        lagsSelectionModel = listViewOfServerFiles.getSelectionModel();
         lagsSelectionModel.setSelectionMode(SelectionMode.MULTIPLE);
 
         ContextMenu contextMenu = new ContextMenu();
@@ -94,8 +98,8 @@ public class Controller implements Initializable, Closeable {
         rename.setOnAction(this::pressButtonRename);
         contextMenu.getItems().add(rename);
 
-        listClientFiles.setContextMenu(contextMenu);
-        listServerFiles.setContextMenu(contextMenu);
+        listViewOfClientFiles.setContextMenu(contextMenu);
+        listViewOfServerFiles.setContextMenu(contextMenu);
     }
 
     private void connectToServer(String operation, String login, String password) {
@@ -111,17 +115,21 @@ public class Controller implements Initializable, Closeable {
                     logger.info("Auth");
 
                     if (requestToServer(Bytes.BYTE_OF_AUTH.toByte(), login, password) == Bytes.BYTE_OF_AUTH_RIGHT.toByte()){
+                        logger.info("Auth OK");
                         authRight();
                         return;
                     } else {
+                        logger.info("Auth wrong!");
                         authWrong();
                     }
                 } else {
                     logger.info("New user");
 
                     if (requestToServer(Bytes.BYTE_OF_NEW_USER.toByte(), login, password) == Bytes.BYTE_OF_NEW_USER_RIGHT.toByte()){
+                        logger.info("New user add OK");
                         newUserRight();
                     } else {
+                        logger.info("New user add wrong!");
                         newUserWrong();
                     }
                 }
@@ -158,6 +166,7 @@ public class Controller implements Initializable, Closeable {
             e.printStackTrace();
         }
 
+        logger.info("Wait byte...");
         int b = in.nextInt();
         logger.info("Byte: " + b);
         return b;
@@ -167,15 +176,33 @@ public class Controller implements Initializable, Closeable {
         String loginAndPassword = login + " " + password;
 
         out.writeByte(b);
+        logger.info("Byte: " + b);
+        waitTenMs();
         out.writeInt(1);
+        logger.info("Int: " + 1);
+        waitTenMs();
         out.writeInt(loginAndPassword.length());
+        logger.info("Int: " + loginAndPassword.length());
+        waitTenMs();
 
         byte[] stringBytes = loginAndPassword.getBytes(StandardCharsets.UTF_8);
         out.write(stringBytes);
     }
 
+    private void waitTenMs() {
+        try {
+            Thread.sleep(10);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
     private void authRight() {
-        logger.info("Auth OK");
+        stage = (Stage) menuBar.getScene().getWindow();
+        clientId = in.nextInt();
+        stage.setTitle(stage.getTitle() + ": user id" + clientId);
+        logger.info("ClientId: " + clientId);
+        folderClientFilesName = FOLDER_CLIENT_FILES_NAME + "user" + clientId + "/";
 
         new Thread(this::refreshAll).start();
 
@@ -189,7 +216,6 @@ public class Controller implements Initializable, Closeable {
 
     private void newUserRight() {
         showAlert("Successful", "Add new user done", "You can login");
-        logger.info("New user add OK");
         signUpPanel.setVisible(false);
         authPanel.setVisible(true);
     }
@@ -212,8 +238,8 @@ public class Controller implements Initializable, Closeable {
     }
 
     private void refreshListOfServerFiles() {
-        listServerFiles.getItems().clear();
-        listSizeServerFiles.getItems().clear();
+        listViewOfServerFiles.getItems().clear();
+        listViewOfSizeServerFiles.getItems().clear();
 
         logger.info("Send byte refresh");
         try {
@@ -230,9 +256,9 @@ public class Controller implements Initializable, Closeable {
 
             while (countFiles != 0){
                 String str = in.next();
-                listServerFiles.getItems().add(str);
+                listViewOfServerFiles.getItems().add(str);
                 long size = in.nextLong();
-                listSizeServerFiles.getItems().add(size);
+                listViewOfSizeServerFiles.getItems().add(size);
                 logger.info("File name: " + str);
                 countFiles--;
             }
@@ -240,8 +266,8 @@ public class Controller implements Initializable, Closeable {
         } else {
             logger.info("Error in inner byte!!");
         }
-        if (listServerFiles.getItems().size() == 0){
-            listServerFiles.getItems().add("Empty");
+        if (listViewOfServerFiles.getItems().size() == 0){
+            listViewOfServerFiles.getItems().add("Empty");
         }
 
         if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
@@ -250,26 +276,27 @@ public class Controller implements Initializable, Closeable {
     }
 
     private void refreshListOfClientFiles() {
-        listClientFiles.getItems().clear();
-        listSizeClientFiles.getItems().clear();
+        listViewOfClientFiles.getItems().clear();
+        listViewOfSizeClientFiles.getItems().clear();
 
         try {
-            Path path = Paths.get(FOLDER_CLIENT_FILES_NAME);
+            logger.info("Path folder: " + folderClientFilesName);
+            Path path = Paths.get(folderClientFilesName);
             if (Files.exists(path)){
-                List<String> listOfFilesClientFiles = Files.list(path)
+                List<String> listOfClientFiles = Files.list(path)
                         .filter(p -> Files.isRegularFile(p))
                         .map(Path::toFile)
                         .map(File::getName)
                         .collect(Collectors.toList());
-                listClientFiles.getItems().addAll(listOfFilesClientFiles);
-                listOfFilesClientFiles.forEach(file -> {
+                listViewOfClientFiles.getItems().addAll(listOfClientFiles);
+                listOfClientFiles.forEach(file -> {
                     long sizeFileName = 0;
                     try {
-                        sizeFileName = Files.size(Paths.get(FOLDER_CLIENT_FILES_NAME + file));
+                        sizeFileName = Files.size(Paths.get(folderClientFilesName + file));
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                    listSizeClientFiles.getItems().add(sizeFileName);
+                    listViewOfSizeClientFiles.getItems().add(sizeFileName);
                 });
             } else {
                 Files.createDirectories(path);
@@ -280,8 +307,8 @@ public class Controller implements Initializable, Closeable {
             e.printStackTrace();
         }
 
-        if (listClientFiles.getItems().size() == 0){
-            listClientFiles.getItems().add("Empty");
+        if (listViewOfClientFiles.getItems().size() == 0){
+            listViewOfClientFiles.getItems().add("Empty");
         }
 
         if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
@@ -333,15 +360,15 @@ public class Controller implements Initializable, Closeable {
     public void pressButtonSelectAll(ActionEvent actionEvent) {
         if (selected != Selected.CLEAR) {
             if (buttonSelectAll.getText().equals("<- Select all")) {
-                listClientFiles.getSelectionModel().selectAll();
+                listViewOfClientFiles.getSelectionModel().selectAll();
             } else {
-                listServerFiles.getSelectionModel().selectAll();
+                listViewOfServerFiles.getSelectionModel().selectAll();
             }
         }
     }
 
     private void getListOfSelectedAndAction(String action) {
-        ObservableList<String> selectedItemsListClients = listClientFiles.getSelectionModel().getSelectedItems();
+        ObservableList<String> selectedItemsListClients = listViewOfClientFiles.getSelectionModel().getSelectedItems();
         if (selectedItemsListClients.size() != 0) {
             if (action.equals("Rename")) {
                 if (selectedItemsListClients.size() == 1) {
@@ -386,20 +413,20 @@ public class Controller implements Initializable, Closeable {
     }
 
     private void copyFile(String fileName, String action) throws IOException {
-        sendFile(FOLDER_CLIENT_FILES_NAME + fileName);
-        logger.info("File send" + fileName);
+        sendFile(folderClientFilesName + fileName);
+        logger.info("File send: " + fileName);
         if (action.equals("Move")) {
             deleteFile(fileName);
         }
     }
 
     private void deleteFile(String file) throws IOException {
-        boolean bool = Files.deleteIfExists(Paths.get(FOLDER_CLIENT_FILES_NAME + file));
+        boolean bool = Files.deleteIfExists(Paths.get(folderClientFilesName + file));
         logger.info("File delete: " + file + "; Result: " + bool);
     }
 
     private void setNewFileName(String file, String newFileName) throws IOException {
-        Path path = Paths.get(FOLDER_CLIENT_FILES_NAME + file);
+        Path path = Paths.get(folderClientFilesName + file);
         Files.move(path, path.resolveSibling(newFileName));
         logger.info("File rename: " + file + " to new name: " + newFileName);
     }
@@ -424,21 +451,18 @@ public class Controller implements Initializable, Closeable {
         logger.info("Send size of file: " + sizeFile);
 
         logger.info("Sending file...");
-        byte[] byteArray = new byte[1];
-        while ((bis.read(byteArray)) != -1){
-            out.writeByte(byteArray[0]);
-        }
-        logger.info("File send");
+        out.write(bis.readNBytes((int) sizeFile));
+
         bis.close();
     }
 
     private void sendListToGetOrDeleteFromServer(byte byteOfOperation){
-        int countNeedsFilesFromServer = listServerFiles.getSelectionModel().getSelectedItems().size();
+        int countNeedsFilesFromServer = listViewOfServerFiles.getSelectionModel().getSelectedItems().size();
         if (countNeedsFilesFromServer != 0) {
             if (byteOfOperation == Bytes.BYTE_OF_RENAME_FILE.toByte()) {
                 if (countNeedsFilesFromServer == 1) {
                     try {
-                        String fileName = listServerFiles.getSelectionModel().getSelectedItem();
+                        String fileName = listViewOfServerFiles.getSelectionModel().getSelectedItem();
 
                         Optional<String> result = setNewFileName(fileName);
                         if (result.isPresent()){
@@ -468,13 +492,15 @@ public class Controller implements Initializable, Closeable {
             } else {
                 logger.info("Send list of need to server");
                 try {
+                    logger.info("Byte: " + byteOfOperation);
                     out.writeByte(byteOfOperation);
+                    logger.info("Count: " + countNeedsFilesFromServer);
                     out.writeInt(countNeedsFilesFromServer);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
 
-                listServerFiles.getSelectionModel().getSelectedItems().forEach(fileName -> {
+                listViewOfServerFiles.getSelectionModel().getSelectedItems().forEach(fileName -> {
                     logger.info("Need: " + fileName);
                     try {
                         out.writeInt(fileName.length());
@@ -494,9 +520,9 @@ public class Controller implements Initializable, Closeable {
 
                     if (b == Bytes.BYTE_OF_SEND_FILE_FROM_SERVER.toByte()) {
                         int id = 0;
-                        List<Integer> ints = listServerFiles.getSelectionModel().getSelectedIndices();
-                        for (String fileName : listServerFiles.getSelectionModel().getSelectedItems()) {
-                            getFile(fileName, listSizeServerFiles.getItems().get(ints.get(id++)));
+                        List<Integer> ints = listViewOfServerFiles.getSelectionModel().getSelectedIndices();
+                        for (String fileName : listViewOfServerFiles.getSelectionModel().getSelectedItems()) {
+                            getFile(fileName, listViewOfSizeServerFiles.getItems().get(ints.get(id++)));
                         }
                     } else {
                         logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
@@ -530,7 +556,7 @@ public class Controller implements Initializable, Closeable {
         logger.info("File name: " + fileName);
         logger.info("Length file: " + sizeFileName);
         try {
-            BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(FOLDER_CLIENT_FILES_NAME + fileName));
+            BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(folderClientFilesName + fileName));
             BufferedInputStream bufferedInputStream = new BufferedInputStream(socket.getInputStream());
 
             if (sizeFileName != 0) {
@@ -573,9 +599,9 @@ public class Controller implements Initializable, Closeable {
 
     @FXML
     public void mouseClickedListClients(MouseEvent mouseEvent) {
-        listServerFiles.getSelectionModel().clearSelection();
-        if (listClientFiles.getItems().get(0).equals("Empty")){
-            listClientFiles.getSelectionModel().clearSelection();
+        listViewOfServerFiles.getSelectionModel().clearSelection();
+        if (listViewOfClientFiles.getItems().get(0).equals("Empty")){
+            listViewOfClientFiles.getSelectionModel().clearSelection();
             setButtonsCaptureClear();
         } else {
             buttonSelectAll.setText("<- Select all");
@@ -589,9 +615,9 @@ public class Controller implements Initializable, Closeable {
 
     @FXML
     public void mouseClickedListServers(MouseEvent mouseEvent) {
-        listClientFiles.getSelectionModel().clearSelection();
-        if (listServerFiles.getItems().get(0).equals("Empty")){
-            listServerFiles.getSelectionModel().clearSelection();
+        listViewOfClientFiles.getSelectionModel().clearSelection();
+        if (listViewOfServerFiles.getItems().get(0).equals("Empty")){
+            listViewOfServerFiles.getSelectionModel().clearSelection();
             setButtonsCaptureClear();
         } else {
             buttonSelectAll.setText("Select all ->");
@@ -609,8 +635,8 @@ public class Controller implements Initializable, Closeable {
     }
 
     private void setListsViewClear() {
-        listClientFiles.getSelectionModel().clearSelection();
-        listServerFiles.getSelectionModel().clearSelection();
+        listViewOfClientFiles.getSelectionModel().clearSelection();
+        listViewOfServerFiles.getSelectionModel().clearSelection();
         setButtonsCaptureClear();
     }
 
@@ -669,7 +695,8 @@ public class Controller implements Initializable, Closeable {
         }
     }
 
-    public void handleExitAction(ActionEvent actionEvent) {
+    public void handleExitAction(ActionEvent actionEvent) throws IOException {
+        close();
         Platform.exit();
     }
 

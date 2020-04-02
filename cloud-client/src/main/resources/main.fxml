@@ -28,18 +28,19 @@
                <Label alignment="CENTER" maxWidth="200.0" minWidth="100.0" prefWidth="200.0" text="Authenticate">
                   <font>
                      <Font size="18.0" />
-                  </font></Label>
+                  </font>
+               </Label>
                <Label text="Login:" />
                <TextField fx:id="loginFieldAuth" maxWidth="200.0" minWidth="100.0" onAction="#pressButtonSignInAuth" prefWidth="200.0" promptText="Enter you login" text="login" />
                <Label text="Password:" />
                <PasswordField fx:id="passFieldAuth" maxWidth="200.0" minWidth="100.0" onAction="#pressButtonSignInAuth" prefWidth="200.0" promptText="Enter you password" text="password" />
-               <Button fx:id="btnSignInAuth" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignInAuth" prefWidth="100.0" text="Sign In" />
+               <Button fx:id="buttonSignInAuth" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignInAuth" prefWidth="100.0" text="Sign In" />
                <Label text="No account? Register:">
                   <VBox.margin>
                      <Insets top="20.0" />
                   </VBox.margin>
                </Label>
-               <Button fx:id="btnSignUpAuth" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignUpAuth" prefWidth="100.0" text="Sign Up" />
+               <Button fx:id="buttonSignUpAuth" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignUpAuth" prefWidth="100.0" text="Sign Up" />
             </VBox>
          </center>
       </BorderPane>
@@ -54,26 +55,26 @@
                <TextField fx:id="loginFieldAdd" maxWidth="200.0" minWidth="100.0" onAction="#pressButtonSignUpAdd" prefWidth="200.0" />
                <Label text="Enter password:" />
                <PasswordField fx:id="passFieldAdd" maxWidth="200.0" minWidth="100.0" onAction="#pressButtonSignUpAdd" prefWidth="200.0" />
-               <Button fx:id="btnSignUpAdd" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignUpAdd" prefWidth="100.0" text="Sign Up" />
+               <Button fx:id="buttonSignUpAdd" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignUpAdd" prefWidth="100.0" text="Sign Up" />
                <Label text="Already have an account?">
                   <VBox.margin>
                      <Insets top="20.0" />
                   </VBox.margin>
                </Label>
-               <Button fx:id="btnSignInAdd" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignInAdd" prefWidth="100.0" text="Sign In" />
+               <Button fx:id="buttonSignInAdd" maxWidth="100.0" minWidth="50.0" onAction="#pressButtonSignInAdd" prefWidth="100.0" text="Sign In" />
             </VBox>
          </center>
       </BorderPane>
       <HBox fx:id="mainPanel" visible="false" HBox.hgrow="ALWAYS">
          <VBox HBox.hgrow="ALWAYS">
             <TextField text="Client files" alignment="CENTER" disable="true" minWidth="100.0" prefWidth="250.0" />
-            <ListView fx:id="listClientFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListClients" prefHeight="200.0" prefWidth="250.0" VBox.vgrow="ALWAYS"/>
+            <ListView fx:id="listViewOfClientFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListClients" prefHeight="200.0" prefWidth="250.0" VBox.vgrow="ALWAYS"/>
          </VBox>
          <VBox HBox.hgrow="SOMETIMES">
             <TextField text="Size, bytes" alignment="CENTER" disable="true" maxWidth="120" minWidth="80.0" prefWidth="80.0" />
-            <ListView fx:id="listSizeClientFiles" maxWidth="120" minHeight="300.0" minWidth="80.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="80.0" VBox.vgrow="ALWAYS" />
+            <ListView fx:id="listViewOfSizeClientFiles" maxWidth="120" minHeight="300.0" minWidth="80.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="80.0" VBox.vgrow="ALWAYS" />
          </VBox>
-         <VBox minHeight="300.0" minWidth="100.0" prefHeight="200.0" prefWidth="100.0" HBox.hgrow="NEVER">
+         <VBox minHeight="300.0" minWidth="100.0" prefHeight="200.0" prefWidth="100.0">
             <Button fx:id="buttonRefreshAll" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonRefreshAll" prefHeight="52.0" prefWidth="100.0" text="Refresh all" textAlignment="CENTER" wrapText="true">
             </Button>
             <Button fx:id="buttonSelectAll" minHeight="25.0" minWidth="100.0" mnemonicParsing="false" onAction="#pressButtonSelectAll" prefWidth="100.0" text="Select all" textAlignment="CENTER" wrapText="true">
@@ -103,12 +104,12 @@
             </Button>
          </VBox>
          <VBox HBox.hgrow="ALWAYS">
-            <TextField text="Client files" alignment="CENTER" disable="true" minWidth="100.0" prefWidth="250.0" />
-            <ListView fx:id="listServerFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListServers" prefHeight="200.0" prefWidth="250.0" VBox.vgrow="ALWAYS"/>
+            <TextField text="Server files" alignment="CENTER" disable="true" minWidth="100.0" prefWidth="250.0" />
+            <ListView fx:id="listViewOfServerFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListServers" prefHeight="200.0" prefWidth="250.0" VBox.vgrow="ALWAYS"/>
          </VBox>
          <VBox HBox.hgrow="SOMETIMES">
             <TextField text="Size, bytes" alignment="CENTER" disable="true" maxWidth="120" minWidth="80.0" prefWidth="80.0" />
-            <ListView fx:id="listSizeServerFiles" maxWidth="120" minHeight="300.0" minWidth="80.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="80.0" VBox.vgrow="ALWAYS"/>
+            <ListView fx:id="listViewOfSizeServerFiles" maxWidth="120" minHeight="300.0" minWidth="80.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="80.0" VBox.vgrow="ALWAYS"/>
          </VBox>
       </HBox>
    </StackPane>

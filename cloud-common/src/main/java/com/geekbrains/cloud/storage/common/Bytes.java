@@ -9,26 +9,22 @@ public enum Bytes {
             {public byte toByte(){return 12;}},
     BYTE_OF_NEW_USER_RIGHT
             {public byte toByte(){return 13;}},
-    BYTE_OF_NEW_USER_WRONG
-            {public byte toByte(){return 14;}},
     BYTE_OF_AUTH
-            {public byte toByte(){return 15;}},
+            {public byte toByte(){return 14;}},
     BYTE_OF_AUTH_RIGHT
-            {public byte toByte(){return 16;}},
-    BYTE_OF_AUTH_WRONG
-            {public byte toByte(){return 17;}},
+            {public byte toByte(){return 15;}},
     BYTE_OF_COPY_FILE
-            {public byte toByte(){return 18;}},
+            {public byte toByte(){return 16;}},
     BYTE_OF_MOVE_FILE
-            {public byte toByte(){return 19;}},
+            {public byte toByte(){return 17;}},
     BYTE_OF_DELETE_FILE
-            {public byte toByte(){return 20;}},
+            {public byte toByte(){return 18;}},
     BYTE_OF_RENAME_FILE
-            {public byte toByte(){return 21;}},
+            {public byte toByte(){return 19;}},
     BYTE_OF_SEND_FILE_FROM_SERVER
-            {public byte toByte(){return 22;}},
+            {public byte toByte(){return 20;}},
     BYTE_OF_SEND_FILE_FROM_CLIENT
-            {public byte toByte(){return 23;}};
+            {public byte toByte(){return 21;}};
 
     public abstract byte toByte();
 }
