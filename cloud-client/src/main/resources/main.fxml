@@ -67,11 +67,11 @@
       </BorderPane>
       <HBox fx:id="mainPanel" visible="false" HBox.hgrow="ALWAYS">
          <VBox HBox.hgrow="ALWAYS">
-            <TextField text="Client files" alignment="CENTER" disable="true" minWidth="100.0" prefWidth="250.0" />
-            <ListView fx:id="listViewOfClientFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListClients" prefHeight="200.0" prefWidth="250.0" VBox.vgrow="ALWAYS"/>
+            <TextField alignment="CENTER" disable="true" minWidth="100.0" prefWidth="250.0" text="Client files" />
+            <ListView fx:id="listViewOfClientFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListClientFiles" prefHeight="200.0" prefWidth="250.0" VBox.vgrow="ALWAYS" />
          </VBox>
          <VBox HBox.hgrow="SOMETIMES">
-            <TextField text="Size, bytes" alignment="CENTER" disable="true" maxWidth="120" minWidth="80.0" prefWidth="80.0" />
+            <TextField alignment="CENTER" disable="true" maxWidth="120" minWidth="80.0" prefWidth="80.0" text="Size, bytes" />
             <ListView fx:id="listViewOfSizeClientFiles" maxWidth="120" minHeight="300.0" minWidth="80.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="80.0" VBox.vgrow="ALWAYS" />
          </VBox>
          <VBox minHeight="300.0" minWidth="100.0" prefHeight="200.0" prefWidth="100.0">
@@ -104,12 +104,12 @@
             </Button>
          </VBox>
          <VBox HBox.hgrow="ALWAYS">
-            <TextField text="Server files" alignment="CENTER" disable="true" minWidth="100.0" prefWidth="250.0" />
-            <ListView fx:id="listViewOfServerFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListServers" prefHeight="200.0" prefWidth="250.0" VBox.vgrow="ALWAYS"/>
+            <TextField alignment="CENTER" disable="true" minWidth="100.0" prefWidth="250.0" text="Server files" />
+            <ListView fx:id="listViewOfServerFiles" minHeight="300.0" minWidth="100.0" onMouseClicked="#mouseClickedListServerFiles" prefHeight="200.0" prefWidth="250.0" VBox.vgrow="ALWAYS" />
          </VBox>
          <VBox HBox.hgrow="SOMETIMES">
-            <TextField text="Size, bytes" alignment="CENTER" disable="true" maxWidth="120" minWidth="80.0" prefWidth="80.0" />
-            <ListView fx:id="listViewOfSizeServerFiles" maxWidth="120" minHeight="300.0" minWidth="80.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="80.0" VBox.vgrow="ALWAYS"/>
+            <TextField alignment="CENTER" disable="true" maxWidth="120" minWidth="80.0" prefWidth="80.0" text="Size, bytes" />
+            <ListView fx:id="listViewOfSizeServerFiles" maxWidth="120" minHeight="300.0" minWidth="80.0" onMouseClicked="#mouseClickedListsBytes" prefHeight="200.0" prefWidth="80.0" VBox.vgrow="ALWAYS" />
          </VBox>
       </HBox>
    </StackPane>

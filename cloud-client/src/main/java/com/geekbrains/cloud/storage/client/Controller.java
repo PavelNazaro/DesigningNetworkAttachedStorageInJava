@@ -21,10 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Optional;
-import java.util.ResourceBundle;
-import java.util.Scanner;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Controller implements Initializable, Closeable {
@@ -38,7 +35,8 @@ public class Controller implements Initializable, Closeable {
     private Selected selected = Selected.CLEAR;
 
     private int clientId = 0;
-    private String folderClientFilesName;
+    private String rootFolderClientFilesName;
+    private String currentFolderClientFilesName;
     private static final String FOLDER_CLIENT_FILES_NAME = "Client Files/";
 
     private Socket socket;
@@ -67,8 +65,8 @@ public class Controller implements Initializable, Closeable {
     @FXML private Button buttonRename;
     @FXML private ListView<String> listViewOfClientFiles;
     @FXML private ListView<String> listViewOfServerFiles;
-    @FXML private ListView<Long> listViewOfSizeClientFiles;
-    @FXML private ListView<Long> listViewOfSizeServerFiles;
+    @FXML private ListView<String> listViewOfSizeClientFiles;
+    @FXML private ListView<String> listViewOfSizeServerFiles;
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
@@ -202,7 +200,8 @@ public class Controller implements Initializable, Closeable {
         clientId = in.nextInt();
         stage.setTitle(stage.getTitle() + ": user id" + clientId);
         logger.info("ClientId: " + clientId);
-        folderClientFilesName = FOLDER_CLIENT_FILES_NAME + "user" + clientId + "/";
+        rootFolderClientFilesName = FOLDER_CLIENT_FILES_NAME + "user" + clientId + "/";
+        currentFolderClientFilesName = rootFolderClientFilesName;
 
         new Thread(this::refreshAll).start();
 
@@ -257,8 +256,8 @@ public class Controller implements Initializable, Closeable {
             while (countFiles != 0){
                 String str = in.next();
                 listViewOfServerFiles.getItems().add(str);
-                long size = in.nextLong();
-                listViewOfSizeServerFiles.getItems().add(size);
+                String sizeFileName = in.next();
+                listViewOfSizeServerFiles.getItems().add(sizeFileName);
                 logger.info("File name: " + str);
                 countFiles--;
             }
@@ -280,23 +279,38 @@ public class Controller implements Initializable, Closeable {
         listViewOfSizeClientFiles.getItems().clear();
 
         try {
-            logger.info("Path folder: " + folderClientFilesName);
-            Path path = Paths.get(folderClientFilesName);
+            logger.info("Path folder: " + currentFolderClientFilesName);
+            Path path = Paths.get(currentFolderClientFilesName);
             if (Files.exists(path)){
+                Map<String, String> mapFileNameAndSize = new LinkedHashMap<>();
+                List<String> listOfClientFolders = Files.list(path)
+                        .filter(p -> Files.isDirectory(p))
+                        .map(Path::getFileName)
+                        .map(path1 -> path1.toString() + "/")
+                        .collect(Collectors.toList());
+                if (! rootFolderClientFilesName.equals(currentFolderClientFilesName)){
+                    mapFileNameAndSize.put("./", "Level_Up");
+                }
+                listOfClientFolders.forEach(fileName -> mapFileNameAndSize.put(fileName, "folder"));
+
                 List<String> listOfClientFiles = Files.list(path)
                         .filter(p -> Files.isRegularFile(p))
                         .map(Path::toFile)
                         .map(File::getName)
                         .collect(Collectors.toList());
-                listViewOfClientFiles.getItems().addAll(listOfClientFiles);
-                listOfClientFiles.forEach(file -> {
+                listOfClientFiles.forEach(fileName -> {
                     long sizeFileName = 0;
                     try {
-                        sizeFileName = Files.size(Paths.get(folderClientFilesName + file));
+                        sizeFileName = Files.size(Paths.get(currentFolderClientFilesName + fileName));
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                    listViewOfSizeClientFiles.getItems().add(sizeFileName);
+                    mapFileNameAndSize.put(fileName, String.valueOf(sizeFileName));
+                });
+
+                mapFileNameAndSize.forEach((fileName, fileSize) -> {
+                    listViewOfClientFiles.getItems().add(fileName);
+                    listViewOfSizeClientFiles.getItems().add(fileSize);
                 });
             } else {
                 Files.createDirectories(path);
@@ -369,38 +383,50 @@ public class Controller implements Initializable, Closeable {
 
     private void getListOfSelectedAndAction(String action) {
         ObservableList<String> selectedItemsListClients = listViewOfClientFiles.getSelectionModel().getSelectedItems();
-        if (selectedItemsListClients.size() != 0) {
-            if (action.equals("Rename")) {
-                if (selectedItemsListClients.size() == 1) {
-                    String fileName = selectedItemsListClients.get(0);
+        int countSelectedItems = selectedItemsListClients.size();
+        if (countSelectedItems != 0) {
+            boolean incorrectChoice = false;
+            for (String selectedItem : selectedItemsListClients) {
+                if (selectedItem.equals("./")){
+                    incorrectChoice = true;
+                    break;
+                }
+            }
+            if (incorrectChoice){
+                showAlert("Error!", "You can't selected './' to operation!", "Choose again");
+            } else {
+                if (action.equals("Rename")) {
+                    if (countSelectedItems == 1) {
+                        String fileName = selectedItemsListClients.get(0);
 
-                    Optional<String> result = setNewFileName(fileName);
-                    if (result.isPresent()){
-                        String newFileName = result.get();
+                        Optional<String> result = setNewFileName(fileName);
+                        if (result.isPresent()) {
+                            String newFileName = result.get();
+                            try {
+                                setNewFileName(fileName, newFileName);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    } else {
+                        showAlert("Warning", "Can't rename many files!", "Select one file and try again");
+                    }
+                } else {
+                    selectedItemsListClients.forEach(fileName -> {
                         try {
-                            setNewFileName(fileName, newFileName);
+                            if (action.equals("Copy") || action.equals("Move")) {
+                                copyFile(currentFolderClientFilesName + fileName, fileName, action);
+                            } else {
+                                deleteFile(currentFolderClientFilesName + fileName);
+                            }
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-                    }
-                } else {
-                    showAlert("Warning", "Can't rename many files!", "Select one file and try again");
+                    });
                 }
-            } else {
-                selectedItemsListClients.forEach(file -> {
-                    try {
-                        if (action.equals("Copy") || action.equals("Move")) {
-                            copyFile(file, action);
-                        } else {
-                            deleteFile(file);
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                });
-            }
 
-            refreshAll();
+                refreshAll();
+            }
         }
     }
 
@@ -412,21 +438,65 @@ public class Controller implements Initializable, Closeable {
         return textInputDialog.showAndWait();
     }
 
-    private void copyFile(String fileName, String action) throws IOException {
-        sendFile(folderClientFilesName + fileName);
+    private void copyFile(String filePath, String fileName, String action) throws IOException {
+        logger.info("File path: " + filePath);
+        if (Files.isDirectory(Paths.get(filePath))) {
+            logger.info("File is directory: " + fileName);
+            sendCatalog(fileName);
+            List<String> files = Files.list(Paths.get(filePath))
+                    .map(Path::toFile)
+                    .map(File::getName)
+                    .collect(Collectors.toList());
+            logger.info("Inner files: " + files);
+            if (files.size() != 0) {
+                for (String enteredFile : files) {
+                    if (Files.isDirectory(Paths.get(filePath + enteredFile))) {
+                        logger.info("is directory");
+                        enteredFile += "/";
+                    }
+                    logger.info("Copy: Path: " + filePath + enteredFile+ " file: " + enteredFile);
+                    try {
+                        copyFile(filePath + enteredFile, enteredFile, action);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            out.writeByte(Bytes.BYTE_OF_CATALOG_LEVEL_UP.toByte());
+        } else {
+            sendFile(filePath);
+        }
         logger.info("File send: " + fileName);
         if (action.equals("Move")) {
-            deleteFile(fileName);
+            deleteFile(filePath);
         }
     }
 
-    private void deleteFile(String file) throws IOException {
-        boolean bool = Files.deleteIfExists(Paths.get(folderClientFilesName + file));
-        logger.info("File delete: " + file + "; Result: " + bool);
+    private void deleteFile(String fileName) throws IOException {
+        logger.info("File name: " + fileName);
+        if (Files.isDirectory(Paths.get(fileName))) {
+            logger.info("is directory");
+            List<String> files = Files.list(Paths.get(fileName))
+                    .map(Path::toFile)
+                    .map(File::getName)
+                    .collect(Collectors.toList());
+            logger.info(files);
+            if (files.size() != 0) {
+                for (String enteredFile : files) {
+                    if (Files.isDirectory(Paths.get(fileName + enteredFile))) {
+                        logger.info("is directory");
+                        enteredFile += "/";
+                    }
+                    deleteFile(fileName + enteredFile);
+                }
+            }
+        }
+        Files.deleteIfExists(Paths.get(fileName));
+        logger.info("Delete: " + fileName);
     }
 
     private void setNewFileName(String file, String newFileName) throws IOException {
-        Path path = Paths.get(folderClientFilesName + file);
+        Path path = Paths.get(currentFolderClientFilesName + file);
         Files.move(path, path.resolveSibling(newFileName));
         logger.info("File rename: " + file + " to new name: " + newFileName);
     }
@@ -456,91 +526,133 @@ public class Controller implements Initializable, Closeable {
         bis.close();
     }
 
+    private void sendCatalog(String fileName) throws IOException {
+        out.writeByte(Bytes.BYTE_OF_SEND_CATALOG_FROM_CLIENT.toByte());
+        out.writeInt(1);
+
+        out.writeInt(fileName.length());
+        logger.info("Send length: " + fileName.length());
+
+        byte[] filenameBytes = fileName.getBytes(StandardCharsets.UTF_8);
+        out.write(filenameBytes);
+        logger.info("Send fileNameBytes: " + new String(filenameBytes, StandardCharsets.UTF_8));
+
+        waitByteOfConfirm();
+    }
+
     private void sendListToGetOrDeleteFromServer(byte byteOfOperation){
-        int countNeedsFilesFromServer = listViewOfServerFiles.getSelectionModel().getSelectedItems().size();
-        if (countNeedsFilesFromServer != 0) {
-            if (byteOfOperation == Bytes.BYTE_OF_RENAME_FILE.toByte()) {
-                if (countNeedsFilesFromServer == 1) {
-                    try {
-                        String fileName = listViewOfServerFiles.getSelectionModel().getSelectedItem();
-
-                        Optional<String> result = setNewFileName(fileName);
-                        if (result.isPresent()){
-                            String newFileName = result.get();
-                            out.writeByte(byteOfOperation);
-                            out.writeInt(2);
-                            logger.info("Need to rename: " + fileName);
-
-                            byte[] stringBytes;
-                            out.writeInt(fileName.length());
-                            stringBytes = fileName.getBytes(StandardCharsets.UTF_8);
-                            out.write(stringBytes);
-
-                            out.writeInt(newFileName.length());
-                            stringBytes = newFileName.getBytes(StandardCharsets.UTF_8);
-                            out.write(stringBytes);
-                            logger.info("Rename send to server");
-
-                            waitByteOfConfirm();
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                } else {
-                    showAlert("Warning", "Can't rename many files!", "Select one file and try again");
+        ObservableList<String> selectedItemsServerFiles = listViewOfServerFiles.getSelectionModel().getSelectedItems();
+        int countSelectedItems = selectedItemsServerFiles.size();
+        if (countSelectedItems != 0) {
+            boolean incorrectChoice = false;
+            for (String selectedItem : selectedItemsServerFiles) {
+                if (selectedItem.equals("./")){
+                    incorrectChoice = true;
+                    break;
                 }
+            }
+            if (incorrectChoice){
+                showAlert("Error!", "You can't selected './' to operation!", "Choose again");
             } else {
-                logger.info("Send list of need to server");
-                try {
-                    logger.info("Byte: " + byteOfOperation);
-                    out.writeByte(byteOfOperation);
-                    logger.info("Count: " + countNeedsFilesFromServer);
-                    out.writeInt(countNeedsFilesFromServer);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                if (byteOfOperation == Bytes.BYTE_OF_RENAME_FILE.toByte()) {
+                    if (countSelectedItems == 1) {
+                        try {
+                            String fileName = listViewOfServerFiles.getSelectionModel().getSelectedItem();
 
-                listViewOfServerFiles.getSelectionModel().getSelectedItems().forEach(fileName -> {
-                    logger.info("Need: " + fileName);
-                    try {
-                        out.writeInt(fileName.length());
-                        byte[] stringBytes = fileName.getBytes(StandardCharsets.UTF_8);
-                        out.write(stringBytes);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                });
-                logger.info("Operation send to server");
+                            Optional<String> result = setNewFileName(fileName);
+                            if (result.isPresent()) {
+                                String newFileName = result.get();
+                                out.writeByte(byteOfOperation);
+                                out.writeInt(2);
+                                logger.info("Need to rename: " + fileName);
 
-                if (byteOfOperation != Bytes.BYTE_OF_DELETE_FILE.toByte()) {
+                                byte[] stringBytes;
+                                out.writeInt(fileName.length());
+                                stringBytes = fileName.getBytes(StandardCharsets.UTF_8);
+                                out.write(stringBytes);
 
-                    logger.info("Byte wait");
-                    byte b = in.nextByte();
-                    logger.info("Byte: " + b);
+                                out.writeInt(newFileName.length());
+                                stringBytes = newFileName.getBytes(StandardCharsets.UTF_8);
+                                out.write(stringBytes);
+                                logger.info("Rename send to server");
 
-                    if (b == Bytes.BYTE_OF_SEND_FILE_FROM_SERVER.toByte()) {
-                        int id = 0;
-                        List<Integer> ints = listViewOfServerFiles.getSelectionModel().getSelectedIndices();
-                        for (String fileName : listViewOfServerFiles.getSelectionModel().getSelectedItems()) {
-                            getFile(fileName, listViewOfSizeServerFiles.getItems().get(ints.get(id++)));
+                                waitByteOfConfirm();
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
                         }
                     } else {
-                        logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
+                        showAlert("Warning", "Can't rename many files!", "Select one file and try again");
                     }
-
+                } else {
+                    logger.info("Send list of need to server");
                     try {
-                        in = new Scanner(socket.getInputStream());
-                        out.writeByte(Bytes.BYTE_OF_CONFIRM.toByte());
-                        Thread.sleep(10);
-                    } catch (Exception e) {
+                        logger.info("Byte: " + byteOfOperation);
+                        out.writeByte(byteOfOperation);
+                        logger.info("Count: " + countSelectedItems);
+                        out.writeInt(countSelectedItems);
+                    } catch (IOException e) {
                         e.printStackTrace();
                     }
-                    logger.info("Files gets from server");
-                }
 
-                waitByteOfConfirm();
+                    listViewOfServerFiles.getSelectionModel().getSelectedItems().forEach(fileName -> {
+                        logger.info("Need: " + fileName);
+                        try {
+                            out.writeInt(fileName.length());
+                            byte[] stringBytes = fileName.getBytes(StandardCharsets.UTF_8);
+                            out.write(stringBytes);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
+                    logger.info("Operation send to server");
+
+                    if (byteOfOperation == Bytes.BYTE_OF_DELETE_FILE.toByte()) {
+                        waitByteOfConfirm();
+                    } else {
+                        while (true) {
+                            logger.info("Byte wait");
+                            byte b = in.nextByte();
+                            logger.info("Byte: " + b);
+                            if (b == Bytes.BYTE_OF_END_OF_SEND_FROM_SERVER.toByte()) {
+                                break;
+                            }
+                            if (b == Bytes.BYTE_OF_CATALOG_LEVEL_UP.toByte()) {
+                                folderLevelUp();
+                            } else if (b == Bytes.BYTE_OF_SEND_CATALOG_FROM_SERVER.toByte()) {
+                                logger.info("Catalog");
+                                String fileName = in.next();
+                                currentFolderClientFilesName += fileName;
+                                File file = new File(currentFolderClientFilesName);
+                                //noinspection ResultOfMethodCallIgnored
+                                file.mkdir();
+                                logger.info("Byte of enter catalog");
+
+                            } else if (b == Bytes.BYTE_OF_SEND_FILE_FROM_SERVER.toByte()) {
+                                logger.info("File");
+                                getFile();
+
+                                try {
+                                    in = new Scanner(socket.getInputStream());
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            } else {
+                                logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
+                            }
+                        }
+                        logger.info("Files gets from server");
+                    }
+                }
             }
         }
+    }
+
+    private void folderLevelUp() {
+        StringBuilder stringBuilder = new StringBuilder(currentFolderClientFilesName);
+        stringBuilder.delete(stringBuilder.lastIndexOf("/") - 1, stringBuilder.length());
+        stringBuilder.delete(stringBuilder.lastIndexOf("/") + 1, stringBuilder.length());
+        currentFolderClientFilesName = stringBuilder.toString();
     }
 
     private void waitByteOfConfirm() {
@@ -552,19 +664,22 @@ public class Controller implements Initializable, Closeable {
         }
     }
 
-    private void getFile(String fileName, long sizeFileName) {
+    private void getFile() {
+        String fileName = in.next();
         logger.info("File name: " + fileName);
-        logger.info("Length file: " + sizeFileName);
+        String sizeFileName = in.next();
+        long size = Long.parseLong(sizeFileName);
+        logger.info("Size file: " + size);
+
         try {
-            BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(folderClientFilesName + fileName));
+            BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(currentFolderClientFilesName + fileName));
             BufferedInputStream bufferedInputStream = new BufferedInputStream(socket.getInputStream());
 
-            if (sizeFileName != 0) {
+            if (size != 0) {
                 byte[] bytes;
-                logger.info("here");
 
                 long leftBytes = 0;
-                while (sizeFileName > leftBytes) {
+                while (size > leftBytes) {
                     int available = bufferedInputStream.available();
                     if (available == 0){
                         try {
@@ -573,6 +688,10 @@ public class Controller implements Initializable, Closeable {
                             e.printStackTrace();
                         }
                         continue;
+                    }
+
+                    if (available > size - leftBytes){
+                        available = (int) (size - leftBytes);
                     }
                     if (available < BYTES){
                         bytes = new byte[available];
@@ -598,7 +717,22 @@ public class Controller implements Initializable, Closeable {
     }
 
     @FXML
-    public void mouseClickedListClients(MouseEvent mouseEvent) {
+    public void mouseClickedListClientFiles(MouseEvent mouseEvent) {
+        if(mouseEvent.getClickCount() == 2){
+            String enteredFolder = listViewOfClientFiles.getSelectionModel().getSelectedItem();
+            logger.info("Entered Folder: " + enteredFolder);
+            if (enteredFolder.equals("./")){
+                StringBuilder stringBuilder = new StringBuilder(currentFolderClientFilesName);
+                stringBuilder.delete(stringBuilder.lastIndexOf("/")-1,stringBuilder.length());
+                stringBuilder.delete(stringBuilder.lastIndexOf("/")+1,stringBuilder.length());
+                currentFolderClientFilesName = stringBuilder.toString();
+
+                refreshListOfClientFiles();
+            } else if (enteredFolder.endsWith("/")) {
+                currentFolderClientFilesName += enteredFolder;
+                refreshListOfClientFiles();
+            }
+        }
         listViewOfServerFiles.getSelectionModel().clearSelection();
         if (listViewOfClientFiles.getItems().get(0).equals("Empty")){
             listViewOfClientFiles.getSelectionModel().clearSelection();
@@ -614,7 +748,29 @@ public class Controller implements Initializable, Closeable {
     }
 
     @FXML
-    public void mouseClickedListServers(MouseEvent mouseEvent) {
+    public void mouseClickedListServerFiles(MouseEvent mouseEvent) throws IOException {
+        if(mouseEvent.getClickCount() == 2){
+            System.out.println("Double clicked");
+            String enteredFolder = listViewOfServerFiles.getSelectionModel().getSelectedItem();
+            logger.info("Entered Folder: " + enteredFolder);
+            if (enteredFolder.endsWith("/")){
+                out.writeByte(Bytes.BYTE_OF_ENTER_CATALOG.toByte());
+                out.writeInt(1);
+
+                out.writeInt(enteredFolder.length());
+                byte[] stringBytes = enteredFolder.getBytes(StandardCharsets.UTF_8);
+                out.write(stringBytes);
+
+                logger.info("Byte wait");
+                byte b = in.nextByte();
+                logger.info("Byte: " + b);
+                if (b == Bytes.BYTE_OF_CONFIRM.toByte()){
+                    refreshListOfServerFiles();
+                } else {
+                    logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
+                }
+            }
+        }
         listViewOfClientFiles.getSelectionModel().clearSelection();
         if (listViewOfServerFiles.getItems().get(0).equals("Empty")){
             listViewOfServerFiles.getSelectionModel().clearSelection();
