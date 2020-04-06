@@ -35,15 +35,14 @@ public class Controller implements Initializable, Closeable {
     private Selected selected = Selected.CLEAR;
 
     private int clientId = 0;
+    private Stage stage;
     private String rootFolderClientFilesName;
     private String currentFolderClientFilesName;
-    private static final String FOLDER_CLIENT_FILES_NAME = "Client Files/";
+    private static final String ROOT_FOLDER_CLIENT_FILES_NAME = "Client Files/";
 
     private Socket socket;
     private DataOutputStream out;
     private Scanner in;
-
-    Stage stage;
 
     @FXML private MenuBar menuBar;
     @FXML private HBox mainPanel;
@@ -63,41 +62,16 @@ public class Controller implements Initializable, Closeable {
     @FXML private Button buttonMove;
     @FXML private Button buttonDelete;
     @FXML private Button buttonRename;
-    @FXML private ListView<String> listViewOfClientFiles;
-    @FXML private ListView<String> listViewOfServerFiles;
-    @FXML private ListView<String> listViewOfSizeClientFiles;
-    @FXML private ListView<String> listViewOfSizeServerFiles;
+    @FXML private TableView<String> tableViewClient;
+    @FXML private TableView<String> tableViewServer;
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
-        MultipleSelectionModel<String> lagsSelectionModel;
-        lagsSelectionModel = listViewOfClientFiles.getSelectionModel();
-        lagsSelectionModel.setSelectionMode(SelectionMode.MULTIPLE);
-        lagsSelectionModel = listViewOfServerFiles.getSelectionModel();
-        lagsSelectionModel.setSelectionMode(SelectionMode.MULTIPLE);
+        authPanel.setVisible(true);
+        signUpPanel.setVisible(false);
+        mainPanel.setVisible(false);
 
-        ContextMenu contextMenu = new ContextMenu();
-        MenuItem refreshAll = new MenuItem("Refresh all");
-        refreshAll.setOnAction(this::pressButtonRefreshAll);
-        contextMenu.getItems().add(refreshAll);
-        MenuItem selectAll = new MenuItem("Select all");
-        selectAll.setOnAction(this::pressButtonSelectAll);
-        contextMenu.getItems().add(selectAll);
-        MenuItem copy = new MenuItem("Copy");
-        copy.setOnAction(this::pressButtonCopy);
-        contextMenu.getItems().add(copy);
-        MenuItem move = new MenuItem("Move");
-        move.setOnAction(this::pressButtonMove);
-        contextMenu.getItems().add(move);
-        MenuItem delete = new MenuItem("Delete");
-        delete.setOnAction(this::pressButtonDelete);
-        contextMenu.getItems().add(delete);
-        MenuItem rename = new MenuItem("Rename");
-        rename.setOnAction(this::pressButtonRename);
-        contextMenu.getItems().add(rename);
-
-        listViewOfClientFiles.setContextMenu(contextMenu);
-        listViewOfServerFiles.setContextMenu(contextMenu);
+        setContextMenu();
     }
 
     private void connectToServer(String operation, String login, String password) {
@@ -132,11 +106,7 @@ public class Controller implements Initializable, Closeable {
                     }
                 }
 
-                try {
-                    close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                close();
 
             } else {
                 showAlert("Error!","Error in connect to server!","Restart server and try again!");
@@ -200,7 +170,7 @@ public class Controller implements Initializable, Closeable {
         clientId = in.nextInt();
         stage.setTitle(stage.getTitle() + ": user id" + clientId);
         logger.info("ClientId: " + clientId);
-        rootFolderClientFilesName = FOLDER_CLIENT_FILES_NAME + "user" + clientId + File.separator;
+        rootFolderClientFilesName = ROOT_FOLDER_CLIENT_FILES_NAME + "user" + clientId + File.separator;
         currentFolderClientFilesName = rootFolderClientFilesName;
 
         new Thread(this::refreshAll).start();
@@ -237,8 +207,7 @@ public class Controller implements Initializable, Closeable {
     }
 
     private void refreshListOfServerFiles() {
-        listViewOfServerFiles.getItems().clear();
-        listViewOfSizeServerFiles.getItems().clear();
+        tableViewServer.getItems().clear();
 
         logger.info("Send byte refresh");
         try {
@@ -255,9 +224,8 @@ public class Controller implements Initializable, Closeable {
 
             while (countFiles != 0){
                 String str = in.next();
-                listViewOfServerFiles.getItems().add(str);
                 String sizeFileName = in.next();
-                listViewOfSizeServerFiles.getItems().add(sizeFileName);
+                tableViewServer.getItems().addAll(str,sizeFileName);
                 logger.info("File name: " + str);
                 countFiles--;
             }
@@ -265,8 +233,8 @@ public class Controller implements Initializable, Closeable {
         } else {
             logger.info("Error in inner byte!!");
         }
-        if (listViewOfServerFiles.getItems().size() == 0){
-            listViewOfServerFiles.getItems().add("Empty");
+        if (tableViewServer.getItems().size() == 0){
+            tableViewServer.getItems().add("Empty");
         }
 
         if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
@@ -275,8 +243,7 @@ public class Controller implements Initializable, Closeable {
     }
 
     private void refreshListOfClientFiles() {
-        listViewOfClientFiles.getItems().clear();
-        listViewOfSizeClientFiles.getItems().clear();
+        tableViewClient.getItems().clear();
 
         try {
             logger.info("Path folder: " + currentFolderClientFilesName);
@@ -308,10 +275,10 @@ public class Controller implements Initializable, Closeable {
                     mapFileNameAndSize.put(fileName, String.valueOf(sizeFileName));
                 });
 
-                mapFileNameAndSize.forEach((fileName, fileSize) -> {
-                    listViewOfClientFiles.getItems().add(fileName);
-                    listViewOfSizeClientFiles.getItems().add(fileSize);
-                });
+//                mapFileNameAndSize.forEach((fileName, fileSize) -> {
+//                    tableViewClient.getItems().addAll(fileName, fileSize);
+//                });
+                tableViewClient.getItems().add(String.valueOf(mapFileNameAndSize));
             } else {
                 Files.createDirectories(path);
             }
@@ -321,8 +288,8 @@ public class Controller implements Initializable, Closeable {
             e.printStackTrace();
         }
 
-        if (listViewOfClientFiles.getItems().size() == 0){
-            listViewOfClientFiles.getItems().add("Empty");
+        if (tableViewClient.getItems().size() == 0){
+            tableViewClient.getItems().add("Empty");
         }
 
         if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
@@ -374,15 +341,15 @@ public class Controller implements Initializable, Closeable {
     public void pressButtonSelectAll(ActionEvent actionEvent) {
         if (selected != Selected.CLEAR) {
             if (buttonSelectAll.getText().equals("<- Select all")) {
-                listViewOfClientFiles.getSelectionModel().selectAll();
+                tableViewClient.getSelectionModel().selectAll();
             } else {
-                listViewOfServerFiles.getSelectionModel().selectAll();
+                tableViewServer.getSelectionModel().selectAll();
             }
         }
     }
 
-    private void getListOfSelectedAndAction(String action) {
-        ObservableList<String> selectedItemsListClients = listViewOfClientFiles.getSelectionModel().getSelectedItems();
+    private void getListOfSelectedAndAction(String action) { //todo
+        ObservableList<String> selectedItemsListClients = tableViewClient.getSelectionModel().getSelectedItems();
         int countSelectedItems = selectedItemsListClients.size();
         if (countSelectedItems != 0) {
             boolean incorrectChoice = false;
@@ -553,8 +520,8 @@ public class Controller implements Initializable, Closeable {
         waitByteOfConfirm();
     }
 
-    private void sendListToGetOrDeleteFromServer(byte byteOfOperation){
-        ObservableList<String> selectedItemsServerFiles = listViewOfServerFiles.getSelectionModel().getSelectedItems();
+    private void sendListToGetOrDeleteFromServer(byte byteOfOperation){ //todo
+        ObservableList<String> selectedItemsServerFiles = tableViewServer.getSelectionModel().getSelectedItems();
         int countSelectedItems = selectedItemsServerFiles.size();
         if (countSelectedItems != 0) {
             boolean incorrectChoice = false;
@@ -570,7 +537,7 @@ public class Controller implements Initializable, Closeable {
                 if (byteOfOperation == Bytes.BYTE_OF_RENAME_FILE.toByte()) {
                     if (countSelectedItems == 1) {
                         try {
-                            String fileName = listViewOfServerFiles.getSelectionModel().getSelectedItem();
+                            String fileName = tableViewServer.getSelectionModel().getSelectedItem();
 
                             Optional<String> result = setNewFileName(fileName);
                             if (result.isPresent()) {
@@ -608,7 +575,7 @@ public class Controller implements Initializable, Closeable {
                         e.printStackTrace();
                     }
 
-                    listViewOfServerFiles.getSelectionModel().getSelectedItems().forEach(fileName -> {
+                    tableViewServer.getSelectionModel().getSelectedItems().forEach(fileName -> {
                         logger.info("Need: " + fileName);
                         try {
                             out.writeInt(fileName.length());
@@ -714,9 +681,9 @@ public class Controller implements Initializable, Closeable {
     }
 
     @FXML
-    public void mouseClickedListClientFiles(MouseEvent mouseEvent) {
+    public void mouseClickedTableViewClientFiles(MouseEvent mouseEvent) { //todo
         if(mouseEvent.getClickCount() == 2){
-            String enteredFolder = listViewOfClientFiles.getSelectionModel().getSelectedItem();
+            String enteredFolder = tableViewClient.getSelectionModel().getSelectedItem();
             logger.info("Entered Folder: " + enteredFolder);
             if (enteredFolder.equals("./")){
                 folderLevelUp();
@@ -727,9 +694,9 @@ public class Controller implements Initializable, Closeable {
                 refreshListOfClientFiles();
             }
         }
-        listViewOfServerFiles.getSelectionModel().clearSelection();
-        if (listViewOfClientFiles.getItems().get(0).equals("Empty")){
-            listViewOfClientFiles.getSelectionModel().clearSelection();
+        tableViewServer.getSelectionModel().clearSelection();
+        if (tableViewClient.getItems().get(0).equals("Empty")){
+            tableViewClient.getSelectionModel().clearSelection();
             setButtonsCaptureClear();
         } else {
             buttonSelectAll.setText("<- Select all");
@@ -742,10 +709,10 @@ public class Controller implements Initializable, Closeable {
     }
 
     @FXML
-    public void mouseClickedListServerFiles(MouseEvent mouseEvent) throws IOException {
+    public void mouseClickedTableViewServerFiles(MouseEvent mouseEvent) throws IOException {
         if(mouseEvent.getClickCount() == 2){
             System.out.println("Double clicked");
-            String enteredFolder = listViewOfServerFiles.getSelectionModel().getSelectedItem();
+            String enteredFolder = tableViewServer.getSelectionModel().getSelectedItem();
             logger.info("Entered Folder: " + enteredFolder);
             if (enteredFolder.endsWith(File.separator)){
                 out.writeByte(Bytes.BYTE_OF_ENTER_CATALOG.toByte());
@@ -765,9 +732,9 @@ public class Controller implements Initializable, Closeable {
                 }
             }
         }
-        listViewOfClientFiles.getSelectionModel().clearSelection();
-        if (listViewOfServerFiles.getItems().get(0).equals("Empty")){
-            listViewOfServerFiles.getSelectionModel().clearSelection();
+        tableViewClient.getSelectionModel().clearSelection();
+        if (tableViewServer.getItems().get(0).equals("Empty")){
+            tableViewServer.getSelectionModel().clearSelection();
             setButtonsCaptureClear();
         } else {
             buttonSelectAll.setText("Select all ->");
@@ -779,14 +746,9 @@ public class Controller implements Initializable, Closeable {
         }
     }
 
-    @FXML
-    public void mouseClickedListsBytes(MouseEvent mouseEvent) {
-        setListsViewClear();
-    }
-
     private void setListsViewClear() {
-        listViewOfClientFiles.getSelectionModel().clearSelection();
-        listViewOfServerFiles.getSelectionModel().clearSelection();
+        tableViewClient.getSelectionModel().clearSelection();
+        tableViewServer.getSelectionModel().clearSelection();
         setButtonsCaptureClear();
     }
 
@@ -845,20 +807,49 @@ public class Controller implements Initializable, Closeable {
         }
     }
 
-    public void handleExitAction(ActionEvent actionEvent) throws IOException {
+    public void handleExitAction(ActionEvent actionEvent) {
         close();
         Platform.exit();
     }
 
     @Override
-    public void close() throws IOException {
-        in.close();
-        out.close();
-        socket.close();
+    public void close() {
+        try {
+            in.close();
+            out.close();
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @FXML
     public void handleAboutAction(ActionEvent actionEvent) {
         showAlert("About", "Create by PavelNazaro", "");
+    }
+
+    private void setContextMenu() {
+        ContextMenu contextMenu = new ContextMenu();
+        MenuItem refreshAll = new MenuItem("Refresh all");
+        refreshAll.setOnAction(this::pressButtonRefreshAll);
+        contextMenu.getItems().add(refreshAll);
+        MenuItem selectAll = new MenuItem("Select all");
+        selectAll.setOnAction(this::pressButtonSelectAll);
+        contextMenu.getItems().add(selectAll);
+        MenuItem copy = new MenuItem("Copy");
+        copy.setOnAction(this::pressButtonCopy);
+        contextMenu.getItems().add(copy);
+        MenuItem move = new MenuItem("Move");
+        move.setOnAction(this::pressButtonMove);
+        contextMenu.getItems().add(move);
+        MenuItem delete = new MenuItem("Delete");
+        delete.setOnAction(this::pressButtonDelete);
+        contextMenu.getItems().add(delete);
+        MenuItem rename = new MenuItem("Rename");
+        rename.setOnAction(this::pressButtonRename);
+        contextMenu.getItems().add(rename);
+
+        tableViewClient.setContextMenu(contextMenu);
+        tableViewServer.setContextMenu(contextMenu);
     }
 }

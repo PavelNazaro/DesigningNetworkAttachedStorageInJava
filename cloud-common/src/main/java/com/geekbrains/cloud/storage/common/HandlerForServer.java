@@ -25,8 +25,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
         GET_COUNT_FILES, GET_LENGTH_NAME_FILE, GET_NAME_FILE,
         SEND_COUNT_FILES,
         SEND_CONFIRM,
-        LEVEL_UP,
-        SEND_FILE
+        LEVEL_UP
     }
     private State currentState = State.IDLE;
 
@@ -40,7 +39,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
     private int clientId = 0;
     private String currentFolderServerFilesName;
     private String rootFolderServerFilesName;
-    private static final String FOLDER_SERVER_FILES_NAME = "Server Files/";
+    private static final String ROOT_FOLDER_SERVER_FILES_NAME = "Server Files/";
 
     private List<Integer> clients = new ArrayList<>();
     private List<String> listOperationOfFiles = new ArrayList<>();
@@ -453,7 +452,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             if (operation.equals("Auth")) {
                 clients.add(clientId);
                 logger.info("Client id: " + clientId);
-                currentFolderServerFilesName = FOLDER_SERVER_FILES_NAME + "user" + clientId + File.separator;
+                currentFolderServerFilesName = ROOT_FOLDER_SERVER_FILES_NAME + "user" + clientId + File.separator;
                 rootFolderServerFilesName = currentFolderServerFilesName;
             } else {
                 ctx.channel().close();
