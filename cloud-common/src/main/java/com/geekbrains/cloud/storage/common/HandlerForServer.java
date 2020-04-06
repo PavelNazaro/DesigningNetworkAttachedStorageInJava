@@ -35,7 +35,6 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
     private int countFiles;
     private byte byteMemory;
     private long fileLength;
-    private long receivedFileLength;
     private byte[] fileName;
 
     private int clientId = 0;
@@ -62,7 +61,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                 if (byteMemory == Bytes.BYTE_OF_SEND_FILE_FROM_CLIENT.toByte()) {
                     logger.info("Send file from client");
                     currentState = State.NAME_LENGTH;
-                    receivedFileLength = 0L;
+                    long receivedFileLength = 0L;
                 } else if (byteMemory == Bytes.BYTE_OF_AUTH.toByte() ||
                         byteMemory == Bytes.BYTE_OF_ENTER_CATALOG.toByte() ||
                         byteMemory == Bytes.BYTE_OF_SEND_CATALOG_FROM_CLIENT.toByte() ||
@@ -287,7 +286,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                 List<String> listOfServerFolders = Files.list(path)
                         .filter(p -> Files.isDirectory(p))
                         .map(Path::getFileName)
-                        .map(path1 -> path1.toString() + "/")
+                        .map(path1 -> path1.toString() + File.separator)
                         .collect(Collectors.toList());
                 if (! rootFolderServerFilesName.equals(currentFolderServerFilesName)){
                     mapFileNameAndSize.put("./", "Level_Up");
@@ -341,10 +340,8 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
     }
 
     private void folderLevelUp() {
-        StringBuilder stringBuilder = new StringBuilder(currentFolderServerFilesName);
-        stringBuilder.delete(stringBuilder.lastIndexOf("/") - 1, stringBuilder.length());
-        stringBuilder.delete(stringBuilder.lastIndexOf("/") + 1, stringBuilder.length());
-        currentFolderServerFilesName = stringBuilder.toString();
+        currentFolderServerFilesName = Paths.get(currentFolderServerFilesName).getParent().toString() + File.separator;
+        logger.info("Folder level up");
     }
 
     private void copyFile(String filePath, String fileName, String action) throws IOException {
@@ -363,7 +360,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                 for (String enteredFile : files) {
                     if (Files.isDirectory(Paths.get(filePath + enteredFile))) {
                         logger.info("is directory");
-                        enteredFile += "/";
+                        enteredFile += File.separator;
                     }
                     logger.info("Copy: Path: " + filePath + enteredFile+ " file: " + enteredFile);
                     try {
@@ -434,7 +431,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                 for (String enteredFile : files) {
                     if (Files.isDirectory(Paths.get(fileName + enteredFile))) {
                         logger.info("is directory");
-                        enteredFile += "/";
+                        enteredFile += File.separator;
                     }
                     deleteFile(fileName + enteredFile);
                 }
@@ -456,7 +453,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             if (operation.equals("Auth")) {
                 clients.add(clientId);
                 logger.info("Client id: " + clientId);
-                currentFolderServerFilesName = FOLDER_SERVER_FILES_NAME + "user" + clientId + "/";
+                currentFolderServerFilesName = FOLDER_SERVER_FILES_NAME + "user" + clientId + File.separator;
                 rootFolderServerFilesName = currentFolderServerFilesName;
             } else {
                 ctx.channel().close();

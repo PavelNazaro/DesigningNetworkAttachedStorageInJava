@@ -200,7 +200,7 @@ public class Controller implements Initializable, Closeable {
         clientId = in.nextInt();
         stage.setTitle(stage.getTitle() + ": user id" + clientId);
         logger.info("ClientId: " + clientId);
-        rootFolderClientFilesName = FOLDER_CLIENT_FILES_NAME + "user" + clientId + "/";
+        rootFolderClientFilesName = FOLDER_CLIENT_FILES_NAME + "user" + clientId + File.separator;
         currentFolderClientFilesName = rootFolderClientFilesName;
 
         new Thread(this::refreshAll).start();
@@ -286,7 +286,7 @@ public class Controller implements Initializable, Closeable {
                 List<String> listOfClientFolders = Files.list(path)
                         .filter(p -> Files.isDirectory(p))
                         .map(Path::getFileName)
-                        .map(path1 -> path1.toString() + "/")
+                        .map(path1 -> path1.toString() + File.separator)
                         .collect(Collectors.toList());
                 if (! rootFolderClientFilesName.equals(currentFolderClientFilesName)){
                     mapFileNameAndSize.put("./", "Level_Up");
@@ -452,7 +452,7 @@ public class Controller implements Initializable, Closeable {
                 for (String enteredFile : files) {
                     if (Files.isDirectory(Paths.get(filePath + enteredFile))) {
                         logger.info("is directory");
-                        enteredFile += "/";
+                        enteredFile += File.separator;
                     }
                     logger.info("Copy: Path: " + filePath + enteredFile+ " file: " + enteredFile);
                     try {
@@ -485,7 +485,7 @@ public class Controller implements Initializable, Closeable {
                 for (String enteredFile : files) {
                     if (Files.isDirectory(Paths.get(fileName + enteredFile))) {
                         logger.info("is directory");
-                        enteredFile += "/";
+                        enteredFile += File.separator;
                     }
                     deleteFile(fileName + enteredFile);
                 }
@@ -521,7 +521,20 @@ public class Controller implements Initializable, Closeable {
         logger.info("Send size of file: " + sizeFile);
 
         logger.info("Sending file...");
-        out.write(bis.readNBytes((int) sizeFile));
+        byte[] bytes;
+        long leftBytes = 0L;
+        while (sizeFile > leftBytes) {
+            if (BYTES < sizeFile) {
+                bytes = new byte[BYTES];
+                leftBytes += BYTES;
+            } else {
+                bytes = new byte[(int) sizeFile];
+                leftBytes += sizeFile;
+            }
+            //noinspection ResultOfMethodCallIgnored
+            bis.read(bytes);
+            out.write(bytes);
+        }
 
         bis.close();
     }
@@ -649,10 +662,8 @@ public class Controller implements Initializable, Closeable {
     }
 
     private void folderLevelUp() {
-        StringBuilder stringBuilder = new StringBuilder(currentFolderClientFilesName);
-        stringBuilder.delete(stringBuilder.lastIndexOf("/") - 1, stringBuilder.length());
-        stringBuilder.delete(stringBuilder.lastIndexOf("/") + 1, stringBuilder.length());
-        currentFolderClientFilesName = stringBuilder.toString();
+        currentFolderClientFilesName = Paths.get(currentFolderClientFilesName).getParent().toString() + File.separator;
+        logger.info("Folder level up");
     }
 
     private void waitByteOfConfirm() {
@@ -668,39 +679,25 @@ public class Controller implements Initializable, Closeable {
         String fileName = in.next();
         logger.info("File name: " + fileName);
         String sizeFileName = in.next();
-        long size = Long.parseLong(sizeFileName);
-        logger.info("Size file: " + size);
+        long sizeFile = Long.parseLong(sizeFileName);
+        logger.info("Size file: " + sizeFile);
 
         try {
             BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(currentFolderClientFilesName + fileName));
             BufferedInputStream bufferedInputStream = new BufferedInputStream(socket.getInputStream());
 
-            if (size != 0) {
+            if (sizeFile != 0) {
                 byte[] bytes;
+                long leftBytes = 0L;
 
-                long leftBytes = 0;
-                while (size > leftBytes) {
-                    int available = bufferedInputStream.available();
-                    if (available == 0){
-                        try {
-                            Thread.sleep(10);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        continue;
-                    }
-
-                    if (available > size - leftBytes){
-                        available = (int) (size - leftBytes);
-                    }
-                    if (available < BYTES){
-                        bytes = new byte[available];
-                        leftBytes += available;
-                    } else {
+                while (sizeFile > leftBytes) {
+                    if (BYTES < sizeFile) {
                         bytes = new byte[BYTES];
                         leftBytes += BYTES;
+                    } else {
+                        bytes = new byte[(int) sizeFile];
+                        leftBytes += sizeFile;
                     }
-
                     //noinspection ResultOfMethodCallIgnored
                     bufferedInputStream.read(bytes);
                     bufferedOutputStream.write(bytes);
@@ -722,13 +719,10 @@ public class Controller implements Initializable, Closeable {
             String enteredFolder = listViewOfClientFiles.getSelectionModel().getSelectedItem();
             logger.info("Entered Folder: " + enteredFolder);
             if (enteredFolder.equals("./")){
-                StringBuilder stringBuilder = new StringBuilder(currentFolderClientFilesName);
-                stringBuilder.delete(stringBuilder.lastIndexOf("/")-1,stringBuilder.length());
-                stringBuilder.delete(stringBuilder.lastIndexOf("/")+1,stringBuilder.length());
-                currentFolderClientFilesName = stringBuilder.toString();
+                folderLevelUp();
 
                 refreshListOfClientFiles();
-            } else if (enteredFolder.endsWith("/")) {
+            } else if (enteredFolder.endsWith(File.separator)) {
                 currentFolderClientFilesName += enteredFolder;
                 refreshListOfClientFiles();
             }
@@ -753,7 +747,7 @@ public class Controller implements Initializable, Closeable {
             System.out.println("Double clicked");
             String enteredFolder = listViewOfServerFiles.getSelectionModel().getSelectedItem();
             logger.info("Entered Folder: " + enteredFolder);
-            if (enteredFolder.endsWith("/")){
+            if (enteredFolder.endsWith(File.separator)){
                 out.writeByte(Bytes.BYTE_OF_ENTER_CATALOG.toByte());
                 out.writeInt(1);
 
