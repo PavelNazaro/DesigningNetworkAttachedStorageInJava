@@ -593,6 +593,12 @@ public class Controller implements Initializable, Closeable {
                                 logger.info("File");
                                 getFile();
 
+                                //Т.к я использую для команд Scanner, а для файлов BufferedInputStream
+                                //Тут приходится переключаться обратно для получения команд
+                                //Без задержки в хендлере сервера (отметил как todo), выдает ошибку в 576 строке
+                                //Caused by: java.util.InputMismatchException
+                                //Т.е мне кажется, что он там получает байт не как для Scanner, а как для BufferedInputStream
+                                //Поэтому если добавить задержку, то проблема уходит, т.к успевает переключиться
                                 try {
                                     in = new Scanner(socket.getInputStream());
                                 } catch (Exception e) {
