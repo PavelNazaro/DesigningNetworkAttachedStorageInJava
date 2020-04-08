@@ -68,8 +68,8 @@
       <HBox fx:id="mainPanel" HBox.hgrow="ALWAYS">
          <TableView fx:id="tableViewClient" HBox.hgrow="ALWAYS" onMouseClicked="#mouseClickedTableViewClientFiles" minWidth="180.0" prefHeight="200.0" prefWidth="330.0">
            <columns>
-             <TableColumn minWidth="100.0" prefWidth="250.0" text="Client files" />
-             <TableColumn minWidth="50.0" text="Size, bytes" />
+             <TableColumn minWidth="100.0" prefWidth="250.0" text="Client files" fx:id="fileClientColumn"/>
+             <TableColumn minWidth="50.0" text="Size, bytes" fx:id="sizeClientColumn"/>
            </columns>
             <columnResizePolicy>
                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
@@ -106,8 +106,8 @@
          </VBox>
          <TableView fx:id="tableViewServer" HBox.hgrow="ALWAYS" onMouseClicked="#mouseClickedTableViewServerFiles" minWidth="180.0" prefHeight="200.0" prefWidth="330.0">
            <columns>
-             <TableColumn minWidth="100.0" prefWidth="250.0" text="Server files" />
-             <TableColumn minWidth="50.0" text="Size, bytes" />
+             <TableColumn minWidth="100.0" prefWidth="250.0" text="Server files" fx:id="fileServerColumn" />
+             <TableColumn minWidth="50.0" text="Size, bytes" fx:id="sizeServerColumn" />
            </columns>
             <columnResizePolicy>
                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />

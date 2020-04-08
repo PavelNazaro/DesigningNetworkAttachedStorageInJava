@@ -1,12 +1,14 @@
 package com.geekbrains.cloud.storage.client;
 
 import com.geekbrains.cloud.storage.common.Bytes;
+import com.geekbrains.cloud.storage.common.Utility;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -26,7 +28,7 @@ import java.util.stream.Collectors;
 
 public class Controller implements Initializable, Closeable {
 
-    private static final int BYTES = 1024*32;
+    private static final byte[] bytes = new byte[1024*8];
     private static final Logger logger = (Logger) LogManager.getLogger(Controller.class);
 
     private enum Selected{
@@ -62,11 +64,23 @@ public class Controller implements Initializable, Closeable {
     @FXML private Button buttonMove;
     @FXML private Button buttonDelete;
     @FXML private Button buttonRename;
-    @FXML private TableView<String> tableViewClient;
-    @FXML private TableView<String> tableViewServer;
+    @FXML private TableView<TableData> tableViewClient;
+    @FXML private TableView<TableData> tableViewServer;
+    @FXML private TableColumn<String, String> fileClientColumn;
+    @FXML private TableColumn<String, String> sizeClientColumn;
+    @FXML private TableColumn<String, String> fileServerColumn;
+    @FXML private TableColumn<String, String> sizeServerColumn;
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
+        tableViewClient.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        tableViewServer.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+
+        fileClientColumn.setCellValueFactory(new PropertyValueFactory<>("fileName"));
+        sizeClientColumn.setCellValueFactory(new PropertyValueFactory<>("sizeFile"));
+        fileServerColumn.setCellValueFactory(new PropertyValueFactory<>("fileName"));
+        sizeServerColumn.setCellValueFactory(new PropertyValueFactory<>("sizeFile"));
+
         authPanel.setVisible(true);
         signUpPanel.setVisible(false);
         mainPanel.setVisible(false);
@@ -145,24 +159,15 @@ public class Controller implements Initializable, Closeable {
 
         out.writeByte(b);
         logger.info("Byte: " + b);
-        waitTenMs();
+
         out.writeInt(1);
         logger.info("Int: " + 1);
-        waitTenMs();
+
         out.writeInt(loginAndPassword.length());
         logger.info("Int: " + loginAndPassword.length());
-        waitTenMs();
 
         byte[] stringBytes = loginAndPassword.getBytes(StandardCharsets.UTF_8);
         out.write(stringBytes);
-    }
-
-    private void waitTenMs() {
-        try {
-            Thread.sleep(10);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 
     private void authRight() {
@@ -225,7 +230,7 @@ public class Controller implements Initializable, Closeable {
             while (countFiles != 0){
                 String str = in.next();
                 String sizeFileName = in.next();
-                tableViewServer.getItems().addAll(str,sizeFileName);
+                tableViewServer.getItems().add(new TableData(str,sizeFileName));
                 logger.info("File name: " + str);
                 countFiles--;
             }
@@ -234,7 +239,7 @@ public class Controller implements Initializable, Closeable {
             logger.info("Error in inner byte!!");
         }
         if (tableViewServer.getItems().size() == 0){
-            tableViewServer.getItems().add("Empty");
+            tableViewServer.getItems().add(new TableData("Empty", ""));
         }
 
         if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
@@ -249,36 +254,11 @@ public class Controller implements Initializable, Closeable {
             logger.info("Path folder: " + currentFolderClientFilesName);
             Path path = Paths.get(currentFolderClientFilesName);
             if (Files.exists(path)){
-                Map<String, String> mapFileNameAndSize = new LinkedHashMap<>();
-                List<String> listOfClientFolders = Files.list(path)
-                        .filter(p -> Files.isDirectory(p))
-                        .map(Path::getFileName)
-                        .map(path1 -> path1.toString() + File.separator)
-                        .collect(Collectors.toList());
-                if (! rootFolderClientFilesName.equals(currentFolderClientFilesName)){
-                    mapFileNameAndSize.put("./", "Level_Up");
-                }
-                listOfClientFolders.forEach(fileName -> mapFileNameAndSize.put(fileName, "folder"));
+                Map<String, String> mapFileNameAndSize = Utility.createMapWithFileNameAndSize(
+                        path, rootFolderClientFilesName, currentFolderClientFilesName);
 
-                List<String> listOfClientFiles = Files.list(path)
-                        .filter(p -> Files.isRegularFile(p))
-                        .map(Path::toFile)
-                        .map(File::getName)
-                        .collect(Collectors.toList());
-                listOfClientFiles.forEach(fileName -> {
-                    long sizeFileName = 0;
-                    try {
-                        sizeFileName = Files.size(Paths.get(currentFolderClientFilesName + fileName));
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    mapFileNameAndSize.put(fileName, String.valueOf(sizeFileName));
-                });
-
-//                mapFileNameAndSize.forEach((fileName, fileSize) -> {
-//                    tableViewClient.getItems().addAll(fileName, fileSize);
-//                });
-                tableViewClient.getItems().add(String.valueOf(mapFileNameAndSize));
+                mapFileNameAndSize.forEach((fileName, fileSize) ->
+                        tableViewClient.getItems().add(new TableData(fileName, fileSize)));
             } else {
                 Files.createDirectories(path);
             }
@@ -289,7 +269,7 @@ public class Controller implements Initializable, Closeable {
         }
 
         if (tableViewClient.getItems().size() == 0){
-            tableViewClient.getItems().add("Empty");
+            tableViewClient.getItems().add(new TableData("Empty", ""));
         }
 
         if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
@@ -348,13 +328,13 @@ public class Controller implements Initializable, Closeable {
         }
     }
 
-    private void getListOfSelectedAndAction(String action) { //todo
-        ObservableList<String> selectedItemsListClients = tableViewClient.getSelectionModel().getSelectedItems();
+    private void getListOfSelectedAndAction(String action) {
+        ObservableList<TableData> selectedItemsListClients = tableViewClient.getSelectionModel().getSelectedItems();
         int countSelectedItems = selectedItemsListClients.size();
         if (countSelectedItems != 0) {
             boolean incorrectChoice = false;
-            for (String selectedItem : selectedItemsListClients) {
-                if (selectedItem.equals("./")){
+            for (TableData selectedItem : selectedItemsListClients) {
+                if (selectedItem.getFileName().equals("./")){
                     incorrectChoice = true;
                     break;
                 }
@@ -364,7 +344,7 @@ public class Controller implements Initializable, Closeable {
             } else {
                 if (action.equals("Rename")) {
                     if (countSelectedItems == 1) {
-                        String fileName = selectedItemsListClients.get(0);
+                        String fileName = selectedItemsListClients.get(0).getFileName();
 
                         Optional<String> result = setNewFileName(fileName);
                         if (result.isPresent()) {
@@ -379,7 +359,8 @@ public class Controller implements Initializable, Closeable {
                         showAlert("Warning", "Can't rename many files!", "Select one file and try again");
                     }
                 } else {
-                    selectedItemsListClients.forEach(fileName -> {
+                    selectedItemsListClients.forEach(tableData -> {
+                        String fileName = tableData.getFileName();
                         try {
                             if (action.equals("Copy") || action.equals("Move")) {
                                 copyFile(currentFolderClientFilesName + fileName, fileName, action);
@@ -488,19 +469,18 @@ public class Controller implements Initializable, Closeable {
         logger.info("Send size of file: " + sizeFile);
 
         logger.info("Sending file...");
-        byte[] bytes;
-        long leftBytes = 0L;
-        while (sizeFile > leftBytes) {
-            if (BYTES < sizeFile) {
-                bytes = new byte[BYTES];
-                leftBytes += BYTES;
+        while (true) {
+            if (sizeFile > bytes.length) {
+                sizeFile -= bytes.length;
+                //noinspection ResultOfMethodCallIgnored
+                bis.read(bytes);
+                out.write(bytes);
             } else {
-                bytes = new byte[(int) sizeFile];
-                leftBytes += sizeFile;
+                //noinspection ResultOfMethodCallIgnored
+                bis.read(bytes, 0, (int) sizeFile);
+                out.write(bytes, 0, (int) sizeFile);
+                break;
             }
-            //noinspection ResultOfMethodCallIgnored
-            bis.read(bytes);
-            out.write(bytes);
         }
 
         bis.close();
@@ -520,13 +500,13 @@ public class Controller implements Initializable, Closeable {
         waitByteOfConfirm();
     }
 
-    private void sendListToGetOrDeleteFromServer(byte byteOfOperation){ //todo
-        ObservableList<String> selectedItemsServerFiles = tableViewServer.getSelectionModel().getSelectedItems();
+    private void sendListToGetOrDeleteFromServer(byte byteOfOperation){
+        ObservableList<TableData> selectedItemsServerFiles = tableViewServer.getSelectionModel().getSelectedItems();
         int countSelectedItems = selectedItemsServerFiles.size();
         if (countSelectedItems != 0) {
             boolean incorrectChoice = false;
-            for (String selectedItem : selectedItemsServerFiles) {
-                if (selectedItem.equals("./")){
+            for (TableData selectedItem : selectedItemsServerFiles) {
+                if (selectedItem.getFileName().equals("./")){
                     incorrectChoice = true;
                     break;
                 }
@@ -537,7 +517,7 @@ public class Controller implements Initializable, Closeable {
                 if (byteOfOperation == Bytes.BYTE_OF_RENAME_FILE.toByte()) {
                     if (countSelectedItems == 1) {
                         try {
-                            String fileName = tableViewServer.getSelectionModel().getSelectedItem();
+                            String fileName = tableViewServer.getSelectionModel().getSelectedItem().getFileName();
 
                             Optional<String> result = setNewFileName(fileName);
                             if (result.isPresent()) {
@@ -575,7 +555,8 @@ public class Controller implements Initializable, Closeable {
                         e.printStackTrace();
                     }
 
-                    tableViewServer.getSelectionModel().getSelectedItems().forEach(fileName -> {
+                    tableViewServer.getSelectionModel().getSelectedItems().forEach(tableData -> {
+                        String fileName = tableData.getFileName();
                         logger.info("Need: " + fileName);
                         try {
                             out.writeInt(fileName.length());
@@ -650,40 +631,37 @@ public class Controller implements Initializable, Closeable {
         logger.info("Size file: " + sizeFile);
 
         try {
-            BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(new FileOutputStream(currentFolderClientFilesName + fileName));
-            BufferedInputStream bufferedInputStream = new BufferedInputStream(socket.getInputStream());
+            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(currentFolderClientFilesName + fileName));
+            BufferedInputStream bis = new BufferedInputStream(socket.getInputStream());
 
             if (sizeFile != 0) {
-                byte[] bytes;
-                long leftBytes = 0L;
-
-                while (sizeFile > leftBytes) {
-                    if (BYTES < sizeFile) {
-                        bytes = new byte[BYTES];
-                        leftBytes += BYTES;
+                while (true) {
+                    if (sizeFile > bytes.length) {
+                        sizeFile -= bytes.length;
+                        //noinspection ResultOfMethodCallIgnored
+                        bis.read(bytes);
+                        bos.write(bytes);
                     } else {
-                        bytes = new byte[(int) sizeFile];
-                        leftBytes += sizeFile;
+                        //noinspection ResultOfMethodCallIgnored
+                        bis.read(bytes, 0, (int) sizeFile);
+                        bos.write(bytes, 0, (int) sizeFile);
+                        break;
                     }
-                    //noinspection ResultOfMethodCallIgnored
-                    bufferedInputStream.read(bytes);
-                    bufferedOutputStream.write(bytes);
                 }
-                logger.info("Left: " + leftBytes);
                 logger.info("File received");
             } else {
                 logger.info("File is clear");
             }
-            bufferedOutputStream.close();
+            bos.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     @FXML
-    public void mouseClickedTableViewClientFiles(MouseEvent mouseEvent) { //todo
+    public void mouseClickedTableViewClientFiles(MouseEvent mouseEvent) {
         if(mouseEvent.getClickCount() == 2){
-            String enteredFolder = tableViewClient.getSelectionModel().getSelectedItem();
+            String enteredFolder = tableViewClient.getSelectionModel().getSelectedItem().getFileName();
             logger.info("Entered Folder: " + enteredFolder);
             if (enteredFolder.equals("./")){
                 folderLevelUp();
@@ -695,7 +673,7 @@ public class Controller implements Initializable, Closeable {
             }
         }
         tableViewServer.getSelectionModel().clearSelection();
-        if (tableViewClient.getItems().get(0).equals("Empty")){
+        if (tableViewClient.getItems().get(0).getFileName().equals("Empty")){
             tableViewClient.getSelectionModel().clearSelection();
             setButtonsCaptureClear();
         } else {
@@ -712,7 +690,7 @@ public class Controller implements Initializable, Closeable {
     public void mouseClickedTableViewServerFiles(MouseEvent mouseEvent) throws IOException {
         if(mouseEvent.getClickCount() == 2){
             System.out.println("Double clicked");
-            String enteredFolder = tableViewServer.getSelectionModel().getSelectedItem();
+            String enteredFolder = tableViewServer.getSelectionModel().getSelectedItem().getFileName();
             logger.info("Entered Folder: " + enteredFolder);
             if (enteredFolder.endsWith(File.separator)){
                 out.writeByte(Bytes.BYTE_OF_ENTER_CATALOG.toByte());
@@ -733,7 +711,7 @@ public class Controller implements Initializable, Closeable {
             }
         }
         tableViewClient.getSelectionModel().clearSelection();
-        if (tableViewServer.getItems().get(0).equals("Empty")){
+        if (tableViewServer.getItems().get(0).getFileName().equals("Empty")){
             tableViewServer.getSelectionModel().clearSelection();
             setButtonsCaptureClear();
         } else {
@@ -770,7 +748,7 @@ public class Controller implements Initializable, Closeable {
     }
 
     @FXML
-    public void pressButtonSignInAdd(ActionEvent actionEvent) {
+    public void pressButtonSignInAdd() {
         loginFieldAuth.clear();
         passFieldAuth.clear();
         signUpPanel.setVisible(false);
@@ -778,7 +756,7 @@ public class Controller implements Initializable, Closeable {
     }
 
     @FXML
-    public void pressButtonSignUpAdd(ActionEvent actionEvent) {
+    public void pressButtonSignUpAdd() {
         String login = loginFieldAdd.getText();
         String password = passFieldAdd.getText();
         if ((login.equals("") || password.equals(""))){
@@ -789,7 +767,7 @@ public class Controller implements Initializable, Closeable {
     }
 
     @FXML
-    public void pressButtonSignUpAuth(ActionEvent actionEvent) {
+    public void pressButtonSignUpAuth() {
         loginFieldAdd.clear();
         passFieldAdd.clear();
         authPanel.setVisible(false);
@@ -797,7 +775,7 @@ public class Controller implements Initializable, Closeable {
     }
 
     @FXML
-    public void pressButtonSignInAuth(ActionEvent actionEvent) {
+    public void pressButtonSignInAuth() {
         String login = loginFieldAuth.getText();
         String password = passFieldAuth.getText();
         if ((login.equals("") || password.equals(""))){
@@ -807,7 +785,7 @@ public class Controller implements Initializable, Closeable {
         }
     }
 
-    public void handleExitAction(ActionEvent actionEvent) {
+    public void handleExitAction() {
         close();
         Platform.exit();
     }
@@ -824,27 +802,33 @@ public class Controller implements Initializable, Closeable {
     }
 
     @FXML
-    public void handleAboutAction(ActionEvent actionEvent) {
+    public void handleAboutAction() {
         showAlert("About", "Create by PavelNazaro", "");
     }
 
     private void setContextMenu() {
         ContextMenu contextMenu = new ContextMenu();
+
         MenuItem refreshAll = new MenuItem("Refresh all");
         refreshAll.setOnAction(this::pressButtonRefreshAll);
         contextMenu.getItems().add(refreshAll);
+
         MenuItem selectAll = new MenuItem("Select all");
         selectAll.setOnAction(this::pressButtonSelectAll);
         contextMenu.getItems().add(selectAll);
+
         MenuItem copy = new MenuItem("Copy");
         copy.setOnAction(this::pressButtonCopy);
         contextMenu.getItems().add(copy);
+
         MenuItem move = new MenuItem("Move");
         move.setOnAction(this::pressButtonMove);
         contextMenu.getItems().add(move);
+
         MenuItem delete = new MenuItem("Delete");
         delete.setOnAction(this::pressButtonDelete);
         contextMenu.getItems().add(delete);
+
         MenuItem rename = new MenuItem("Rename");
         rename.setOnAction(this::pressButtonRename);
         contextMenu.getItems().add(rename);

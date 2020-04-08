@@ -1,8 +1,7 @@
 package com.geekbrains.cloud.storage.common;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 
@@ -60,7 +59,6 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                 if (byteMemory == Bytes.BYTE_OF_SEND_FILE_FROM_CLIENT.toByte()) {
                     logger.info("Send file from client");
                     currentState = State.NAME_LENGTH;
-                    long receivedFileLength = 0L;
                 } else if (byteMemory == Bytes.BYTE_OF_AUTH.toByte() ||
                         byteMemory == Bytes.BYTE_OF_ENTER_CATALOG.toByte() ||
                         byteMemory == Bytes.BYTE_OF_SEND_CATALOG_FROM_CLIENT.toByte() ||
@@ -281,31 +279,8 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                     logger.info("Create new directory");
                 }
 
-                Map<String, String> mapFileNameAndSize = new LinkedHashMap<>();
-                List<String> listOfServerFolders = Files.list(path)
-                        .filter(p -> Files.isDirectory(p))
-                        .map(Path::getFileName)
-                        .map(path1 -> path1.toString() + File.separator)
-                        .collect(Collectors.toList());
-                if (! rootFolderServerFilesName.equals(currentFolderServerFilesName)){
-                    mapFileNameAndSize.put("./", "Level_Up");
-                }
-                listOfServerFolders.forEach(fileName -> mapFileNameAndSize.put(fileName,"folder"));
-
-                List<String> listOfServerFiles = Files.list(path)
-                        .filter(p -> Files.isRegularFile(p))
-                        .map(Path::toFile)
-                        .map(File::getName)
-                        .collect(Collectors.toList());
-                listOfServerFiles.forEach(fileName -> {
-                    long sizeFileName = 0;
-                    try {
-                        sizeFileName = Files.size(Paths.get(currentFolderServerFilesName + fileName));
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    mapFileNameAndSize.put(fileName, String.valueOf(sizeFileName));
-                });
+                Map<String, String> mapFileNameAndSize = Utility.createMapWithFileNameAndSize(
+                        path, rootFolderServerFilesName, currentFolderServerFilesName);
 
                 sendBytesObjectToClient(Bytes.BYTE_OF_CONFIRM.toByte());
                 sendBytesObjectToClient(mapFileNameAndSize.size());
@@ -369,10 +344,10 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
                     }
                 }
             }
-            waitOneHundredMs();
+//            waitOneHundredMs();//todo
             sendBytesObjectToClient(Bytes.BYTE_OF_CATALOG_LEVEL_UP.toByte());
         } else {
-            waitOneHundredMs();
+//            waitOneHundredMs();//todo
             sendBytesObjectToClient(Bytes.BYTE_OF_SEND_FILE_FROM_SERVER.toByte());
             sendBytesObjectToClient(fileName);
 
@@ -398,23 +373,15 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
 
         sendBytesObjectToClient(String.valueOf(sizeFile));
 
-        BufferedInputStream bis = new BufferedInputStream(new FileInputStream(fileName));
-
         if (sizeFile != 0) {
             logger.info("Sending file...");
-            byte[] bytes = new byte[(int) sizeFile];
-            //noinspection ResultOfMethodCallIgnored
-            bis.read(bytes);
 
-            waitOneHundredMs();
-
-            ByteBuf buf = ctx.alloc().buffer(bytes.length);
-            buf.writeBytes(bytes);
-            ctx.writeAndFlush(buf);
+            FileRegion region = new DefaultFileRegion(new FileInputStream(path.toFile()).getChannel(), 0, sizeFile);
+            ctx.channel().alloc().buffer((int) sizeFile);
+            ctx.channel().writeAndFlush(region);
         } else {
             logger.info("File is clear");
         }
-        bis.close();
     }
 
     private void deleteFile(String fileName) throws IOException {
