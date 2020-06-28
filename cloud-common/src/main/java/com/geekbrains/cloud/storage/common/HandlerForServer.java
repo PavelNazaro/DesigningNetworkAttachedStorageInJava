@@ -1,6 +1,7 @@
 package com.geekbrains.cloud.storage.common;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
@@ -44,7 +45,7 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
     private List<String> listOperationOfFiles = new ArrayList<>();
 
     private BufferedOutputStream out;
-    private ChannelHandlerContext ctx;
+    private Channel channel;
     private Connection conn;
     private Statement stmt;
 
@@ -377,8 +378,8 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
             logger.info("Sending file...");
 
             FileRegion region = new DefaultFileRegion(new FileInputStream(path.toFile()).getChannel(), 0, sizeFile);
-            ctx.channel().alloc().buffer((int) sizeFile);
-            ctx.channel().writeAndFlush(region);
+            channel.alloc().buffer((int) sizeFile);
+            channel.writeAndFlush(region);
         } else {
             logger.info("File is clear");
         }
@@ -414,20 +415,20 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
 
         if (sendQueryFromDB(operation, login, password)){
             logger.info(operation + " OK");
-            sendBytesObjectToClient(byteOfRight);
-            sendBytesObjectToClient(clientId);
+            sendObjectToClient(byteOfRight);
+            sendObjectToClient(clientId);
             if (operation.equals("Auth")) {
                 clients.add(clientId);
                 logger.info("Client id: " + clientId);
                 currentFolderServerFilesName = ROOT_FOLDER_SERVER_FILES_NAME + "user" + clientId + File.separator;
                 rootFolderServerFilesName = currentFolderServerFilesName;
             } else {
-                ctx.channel().close();
+                channel.close();
             }
         } else {
             logger.info(operation + " wrong. Close channel!");
-            sendBytesObjectToClient(Bytes.BYTE_OF_CONFIRM.toByte());
-            ctx.channel().close();
+            sendBytesObjectToClient(Bytes.BYTE_OF_AUTH_WRONG.toByte());
+            channel.close();
         }
     }
 
@@ -475,17 +476,49 @@ public class HandlerForServer extends ChannelInboundHandlerAdapter {
 
     private void sendBytesObjectToClient(Object bytesToSend) {
         byte[] arr = (bytesToSend + "\n").getBytes();
-        ByteBuf buf = ctx.alloc().buffer(arr.length);
+        ByteBuf buf = channel.alloc().buffer(arr.length);
         buf.writeBytes(arr);
-        ctx.writeAndFlush(buf);
+        channel.writeAndFlush(buf);
         logger.info("Send byte: " + bytesToSend);
+    }
+
+    private void sendObjectToClient(Object objectToSend) {
+        if (objectToSend instanceof Byte){
+            sendByteToClient((Byte) objectToSend);
+        } else if (objectToSend instanceof Integer){
+            sendIntToClient((Integer) objectToSend);
+        } else if (objectToSend instanceof byte[]){
+            sendBytesToClient((byte[]) objectToSend);
+        }
+    }
+
+    private void sendByteToClient(byte bytesToSend) {
+        ByteBuf buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+        buf.writeByte(bytesToSend);
+        channel.writeAndFlush(buf);
+        logger.info("Send byte: " + bytesToSend);
+    }
+
+    private void sendIntToClient(int intToSend) {
+        ByteBuf buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+        buf.writeInt(intToSend);
+        channel.writeAndFlush(buf);
+        logger.info("Send byte: " + intToSend);
+    }
+
+    private void sendBytesToClient(byte[] bytesToSend) {
+        ByteBuf buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+        buf.writeBytes(bytesToSend);
+        channel.writeAndFlush(buf);
+        logger.info("Send bytes: " + Arrays.toString(bytesToSend));
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx){
-        this.ctx = ctx;
+        this.channel = ctx.channel();
         logger.info("New client connected...");
-        sendBytesObjectToClient(Bytes.BYTE_OF_CONFIRM.toByte());
+//        sendBytesObjectToClient(Bytes.BYTE_OF_CONFIRM.toByte());
+        //Тут отправляется этот байт "10" на клиента
     }
 
     @Override

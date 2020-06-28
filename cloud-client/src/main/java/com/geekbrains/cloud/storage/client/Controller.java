@@ -2,6 +2,9 @@ package com.geekbrains.cloud.storage.client;
 
 import com.geekbrains.cloud.storage.common.Bytes;
 import com.geekbrains.cloud.storage.common.Utility;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.*;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -17,16 +20,16 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 
 import java.io.*;
-import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
-public class Controller implements Initializable, Closeable {
+public class Controller implements Initializable {
 
     private static final byte[] bytes = new byte[1024*8];
     private static final Logger logger = (Logger) LogManager.getLogger(Controller.class);
@@ -40,11 +43,8 @@ public class Controller implements Initializable, Closeable {
     private Stage stage;
     private String rootFolderClientFilesName;
     private String currentFolderClientFilesName;
+    private Channel channel;
     private static final String ROOT_FOLDER_CLIENT_FILES_NAME = "Client Files/";
-
-    private Socket socket;
-    private DataOutputStream out;
-    private Scanner in;
 
     @FXML private MenuBar menuBar;
     @FXML private HBox mainPanel;
@@ -88,93 +88,106 @@ public class Controller implements Initializable, Closeable {
         setContextMenu();
     }
 
-    private void connectToServer(String operation, String login, String password) {
+    private void callback(Object... args) throws IOException {
+        System.out.println("Read");
+        ByteBuf buf = ((ByteBuf) args[0]);
+        while (buf.readableBytes() > 0) {
+            byte readed = buf.readByte();
+            System.out.println("Read: " + readed);
+
+            if (readed == Bytes.BYTE_OF_AUTH_RIGHT.toByte()){
+                logger.info("Auth OK");
+                clientId = buf.readInt();
+                logger.info("ClientId: " + clientId);
+                authRight();
+//                return;
+            } else if (readed == Bytes.BYTE_OF_AUTH_WRONG.toByte()){
+                logger.info("Auth wrong!");
+                authWrong();
+                closeConnection();
+            }
+
+//            if (readed == Bytes.BYTE_OF_NEW_USER_RIGHT.toByte()){
+//                logger.info("New user add OK");
+//                newUserRight();
+//            } else {
+//                logger.info("New user add wrong!");
+//                newUserWrong();
+//            }
+        }
+        if (buf.readableBytes() == 0) {
+            buf.release();
+        }
+    }
+
+    private void connectToServer(String operation, String login, String password) throws IOException {
         logger.info(String.format("Login to server with login: '%s' and password: '%s'", login, password));
 
-        if (connectToServer()){
-            logger.info("Wait connect");
-            byte x = in.nextByte();
-            logger.info("Network: " + x);
-
-            if (x == Bytes.BYTE_OF_CONFIRM.toByte()) {
-                if (operation.equals("Auth")){
-                    logger.info("Auth");
-
-                    if (requestToServer(Bytes.BYTE_OF_AUTH.toByte(), login, password) == Bytes.BYTE_OF_AUTH_RIGHT.toByte()){
-                        logger.info("Auth OK");
-                        authRight();
-                        return;
-                    } else {
-                        logger.info("Auth wrong!");
-                        authWrong();
-                    }
-                } else {
-                    logger.info("New user");
-
-                    if (requestToServer(Bytes.BYTE_OF_NEW_USER.toByte(), login, password) == Bytes.BYTE_OF_NEW_USER_RIGHT.toByte()){
-                        logger.info("New user add OK");
-                        newUserRight();
-                    } else {
-                        logger.info("New user add wrong!");
-                        newUserWrong();
-                    }
-                }
-
-                close();
-
-            } else {
-                showAlert("Error!","Error in connect to server!","Restart server and try again!");
-            }
+        if (operation.equals("Auth")){
+            logger.info("Auth");
+            requestToServer(Bytes.BYTE_OF_AUTH.toByte(), login, password);
+        } else {
+            logger.info("New user");
+            requestToServer(Bytes.BYTE_OF_NEW_USER.toByte(), login, password);
         }
     }
 
-    private boolean connectToServer() {
-        try {
-            socket = new Socket("localhost", 8189);
-            out = new DataOutputStream(socket.getOutputStream());
-            in = new Scanner(socket.getInputStream());
-        } catch (Exception e) {
-            showAlert("Error!", "Connection to server refused!", "Restart server and try again!");
-            e.printStackTrace();
-            return false;
-        }
-        return true;
-    }
-
-    private int requestToServer(byte byteSend, String login, String password) {
-        try {
-            sendByteToServer(byteSend, login, password);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        logger.info("Wait byte...");
-        int b = in.nextInt();
-        logger.info("Byte: " + b);
-        return b;
-    }
-
-    private void sendByteToServer(byte b, String login, String password) throws IOException {
+    private void requestToServer(byte byteSend, String login, String password) throws IOException {
         String loginAndPassword = login + " " + password;
 
-        out.writeByte(b);
-        logger.info("Byte: " + b);
+        sendObjectToServer(byteSend);
+//        out.writeByte(b);
+        logger.info("Byte: " + byteSend);
 
-        out.writeInt(1);
+        sendObjectToServer(1);
+//        out.writeInt(1);
         logger.info("Int: " + 1);
 
-        out.writeInt(loginAndPassword.length());
+        sendObjectToServer(loginAndPassword.length());
+//        out.writeInt(loginAndPassword.length());
         logger.info("Int: " + loginAndPassword.length());
 
         byte[] stringBytes = loginAndPassword.getBytes(StandardCharsets.UTF_8);
-        out.write(stringBytes);
+        sendObjectToServer(stringBytes);
+//        out.write(stringBytes);
+    }
+
+    private void sendObjectToServer(Object objectToSend) {
+        if (objectToSend instanceof Byte){
+            sendByteToServer((Byte) objectToSend);
+        } else if (objectToSend instanceof Integer){
+            sendIntToServer((Integer) objectToSend);
+        } else if (objectToSend instanceof byte[]){
+            sendBytesToServer((byte[]) objectToSend);
+        }
+    }
+
+    private void sendByteToServer(byte bytesToSend) {
+        ByteBuf buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+        buf.writeByte(bytesToSend);
+        channel.writeAndFlush(buf);
+        logger.info("Send byte: " + bytesToSend);
+    }
+
+    private void sendIntToServer(int intToSend) {
+        ByteBuf buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+        buf.writeInt(intToSend);
+        channel.writeAndFlush(buf);
+        logger.info("Send byte: " + intToSend);
+    }
+
+    private void sendBytesToServer(byte[] bytesToSend) {
+        ByteBuf buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+        buf.writeBytes(bytesToSend);
+        channel.writeAndFlush(buf);
+        logger.info("Send bytes: " + Arrays.toString(bytesToSend));
     }
 
     private void authRight() {
-        stage = (Stage) menuBar.getScene().getWindow();
-        clientId = in.nextInt();
-        stage.setTitle(stage.getTitle() + ": user id" + clientId);
-        logger.info("ClientId: " + clientId);
+        Platform.runLater(() -> {
+            stage = (Stage) menuBar.getScene().getWindow();
+            stage.setTitle(stage.getTitle() + ": user id" + clientId);
+        });
         rootFolderClientFilesName = ROOT_FOLDER_CLIENT_FILES_NAME + "user" + clientId + File.separator;
         currentFolderClientFilesName = rootFolderClientFilesName;
 
@@ -205,46 +218,50 @@ public class Controller implements Initializable, Closeable {
 
     private void refreshAll() {
         refreshListOfClientFiles();
-        refreshListOfServerFiles();
+        try {
+            refreshListOfServerFiles();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         logger.info("Refresh all done");
         logger.info("__________________________");
     }
 
-    private void refreshListOfServerFiles() {
-        tableViewServer.getItems().clear();
-
-        logger.info("Send byte refresh");
-        try {
-            out.writeByte(Bytes.BYTE_OF_REFRESH.toByte());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        byte b = in.nextByte();
-        logger.info("Byte: " + b);
-        if (b == Bytes.BYTE_OF_CONFIRM.toByte()) {
-            int countFiles = in.nextInt();
-            logger.info("Count of files: " + countFiles);
-
-            while (countFiles != 0){
-                String str = in.next();
-                String sizeFileName = in.next();
-                tableViewServer.getItems().add(new TableData(str,sizeFileName));
-                logger.info("File name: " + str);
-                countFiles--;
-            }
-            logger.info("Refresh list servers done");
-        } else {
-            logger.info("Error in inner byte!!");
-        }
-        if (tableViewServer.getItems().size() == 0){
-            tableViewServer.getItems().add(new TableData("Empty", ""));
-        }
-
-        if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
-            setListsViewClear();
-        }
+    private void refreshListOfServerFiles() throws IOException {
+//        tableViewServer.getItems().clear();
+//
+//        logger.info("Send byte refresh");
+//        try {
+//            out.writeByte(Bytes.BYTE_OF_REFRESH.toByte());
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//
+//        byte b = in.readByte();
+//        logger.info("Byte: " + b);
+//        if (b == Bytes.BYTE_OF_CONFIRM.toByte()) {
+//            int countFiles = in.readByte();
+//            logger.info("Count of files: " + countFiles);
+//
+//            while (countFiles != 0){
+//                String str = in.readUTF();
+//                String sizeFileName = in.readUTF();
+//                tableViewServer.getItems().add(new TableData(str,sizeFileName));
+//                logger.info("File name: " + str);
+//                countFiles--;
+//            }
+//            logger.info("Refresh list servers done");
+//        } else {
+//            logger.info("Error in inner byte!!");
+//        }
+//        if (tableViewServer.getItems().size() == 0){
+//            tableViewServer.getItems().add(new TableData("Empty", ""));
+//        }
+//
+//        if (Thread.currentThread().getName().equals("JavaFX Application Thread")) {
+//            setListsViewClear();
+//        }
     }
 
     private void refreshListOfClientFiles() {
@@ -305,7 +322,11 @@ public class Controller implements Initializable, Closeable {
                 getListOfSelectedAndAction(operation);
             } else {
                 logger.info(operation + " from server");
-                sendListToGetOrDeleteFromServer(byteOfOperation);
+                try {
+                    sendListToGetOrDeleteFromServer(byteOfOperation);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         } else {
             showAlert("Error!", "Nothing selected!", "Please select any file!");
@@ -387,37 +408,37 @@ public class Controller implements Initializable, Closeable {
     }
 
     private void copyFile(String filePath, String fileName, String action) throws IOException {
-        logger.info("File path: " + filePath);
-        if (Files.isDirectory(Paths.get(filePath))) {
-            logger.info("File is directory: " + fileName);
-            sendCatalog(fileName);
-            List<String> files = Files.list(Paths.get(filePath))
-                    .map(Path::toFile)
-                    .map(File::getName)
-                    .collect(Collectors.toList());
-            logger.info("Inner files: " + files);
-            if (files.size() != 0) {
-                for (String enteredFile : files) {
-                    if (Files.isDirectory(Paths.get(filePath + enteredFile))) {
-                        logger.info("is directory");
-                        enteredFile += File.separator;
-                    }
-                    logger.info("Copy: Path: " + filePath + enteredFile+ " file: " + enteredFile);
-                    try {
-                        copyFile(filePath + enteredFile, enteredFile, action);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-            out.writeByte(Bytes.BYTE_OF_CATALOG_LEVEL_UP.toByte());
-        } else {
-            sendFile(filePath);
-        }
-        logger.info("File send: " + fileName);
-        if (action.equals("Move")) {
-            deleteFile(filePath);
-        }
+//        logger.info("File path: " + filePath);
+//        if (Files.isDirectory(Paths.get(filePath))) {
+//            logger.info("File is directory: " + fileName);
+//            sendCatalog(fileName);
+//            List<String> files = Files.list(Paths.get(filePath))
+//                    .map(Path::toFile)
+//                    .map(File::getName)
+//                    .collect(Collectors.toList());
+//            logger.info("Inner files: " + files);
+//            if (files.size() != 0) {
+//                for (String enteredFile : files) {
+//                    if (Files.isDirectory(Paths.get(filePath + enteredFile))) {
+//                        logger.info("is directory");
+//                        enteredFile += File.separator;
+//                    }
+//                    logger.info("Copy: Path: " + filePath + enteredFile+ " file: " + enteredFile);
+//                    try {
+//                        copyFile(filePath + enteredFile, enteredFile, action);
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            }
+//            out.writeByte(Bytes.BYTE_OF_CATALOG_LEVEL_UP.toByte());
+//        } else {
+//            sendFile(filePath);
+//        }
+//        logger.info("File send: " + fileName);
+//        if (action.equals("Move")) {
+//            deleteFile(filePath);
+//        }
     }
 
     private void deleteFile(String fileName) throws IOException {
@@ -450,169 +471,157 @@ public class Controller implements Initializable, Closeable {
     }
 
     private void sendFile(String fileName) throws IOException {
-        Path path = Paths.get(fileName);
-        long sizeFile = Files.size(path);
-
-        BufferedInputStream bis = new BufferedInputStream(new FileInputStream(fileName));
-
-        out.writeByte(Bytes.BYTE_OF_SEND_FILE_FROM_CLIENT.toByte());
-
-        int length = path.getFileName().toString().length();
-        out.writeInt(length);
-        logger.info("Send length: " + length);
-
-        byte[] filenameBytes = path.getFileName().toString().getBytes(StandardCharsets.UTF_8);
-        out.write(filenameBytes);
-        logger.info("Send fileNameBytes: " + new String(filenameBytes, StandardCharsets.UTF_8));
-
-        out.writeLong(sizeFile);
-        logger.info("Send size of file: " + sizeFile);
-
-        logger.info("Sending file...");
-        while (true) {
-            if (sizeFile > bytes.length) {
-                sizeFile -= bytes.length;
-                //noinspection ResultOfMethodCallIgnored
-                bis.read(bytes);
-                out.write(bytes);
-            } else {
-                //noinspection ResultOfMethodCallIgnored
-                bis.read(bytes, 0, (int) sizeFile);
-                out.write(bytes, 0, (int) sizeFile);
-                break;
-            }
-        }
-
-        bis.close();
+//        Path path = Paths.get(fileName);
+//        long sizeFile = Files.size(path);
+//
+//        BufferedInputStream bis = new BufferedInputStream(new FileInputStream(fileName));
+//
+//        out.writeByte(Bytes.BYTE_OF_SEND_FILE_FROM_CLIENT.toByte());
+//
+//        int length = path.getFileName().toString().length();
+//        out.writeInt(length);
+//        logger.info("Send length: " + length);
+//
+//        byte[] filenameBytes = path.getFileName().toString().getBytes(StandardCharsets.UTF_8);
+//        out.write(filenameBytes);
+//        logger.info("Send fileNameBytes: " + new String(filenameBytes, StandardCharsets.UTF_8));
+//
+//        out.writeLong(sizeFile);
+//        logger.info("Send size of file: " + sizeFile);
+//
+//        logger.info("Sending file...");
+//        while (true) {
+//            if (sizeFile > bytes.length) {
+//                sizeFile -= bytes.length;
+//                //noinspection ResultOfMethodCallIgnored
+//                bis.read(bytes);
+//                out.write(bytes);
+//            } else {
+//                //noinspection ResultOfMethodCallIgnored
+//                bis.read(bytes, 0, (int) sizeFile);
+//                out.write(bytes, 0, (int) sizeFile);
+//                break;
+//            }
+//        }
+//
+//        bis.close();
     }
 
     private void sendCatalog(String fileName) throws IOException {
-        out.writeByte(Bytes.BYTE_OF_SEND_CATALOG_FROM_CLIENT.toByte());
-        out.writeInt(1);
-
-        out.writeInt(fileName.length());
-        logger.info("Send length: " + fileName.length());
-
-        byte[] filenameBytes = fileName.getBytes(StandardCharsets.UTF_8);
-        out.write(filenameBytes);
-        logger.info("Send fileNameBytes: " + new String(filenameBytes, StandardCharsets.UTF_8));
-
-        waitByteOfConfirm();
+//        out.writeByte(Bytes.BYTE_OF_SEND_CATALOG_FROM_CLIENT.toByte());
+//        out.writeInt(1);
+//
+//        out.writeInt(fileName.length());
+//        logger.info("Send length: " + fileName.length());
+//
+//        byte[] filenameBytes = fileName.getBytes(StandardCharsets.UTF_8);
+//        out.write(filenameBytes);
+//        logger.info("Send fileNameBytes: " + new String(filenameBytes, StandardCharsets.UTF_8));
+//
+//        waitByteOfConfirm();
     }
 
-    private void sendListToGetOrDeleteFromServer(byte byteOfOperation){
-        ObservableList<TableData> selectedItemsServerFiles = tableViewServer.getSelectionModel().getSelectedItems();
-        int countSelectedItems = selectedItemsServerFiles.size();
-        if (countSelectedItems != 0) {
-            boolean incorrectChoice = false;
-            for (TableData selectedItem : selectedItemsServerFiles) {
-                if (selectedItem.getFileName().equals("./")){
-                    incorrectChoice = true;
-                    break;
-                }
-            }
-            if (incorrectChoice){
-                showAlert("Error!", "You can't selected './' to operation!", "Choose again");
-            } else {
-                if (byteOfOperation == Bytes.BYTE_OF_RENAME_FILE.toByte()) {
-                    if (countSelectedItems == 1) {
-                        try {
-                            String fileName = tableViewServer.getSelectionModel().getSelectedItem().getFileName();
-
-                            Optional<String> result = setNewFileName(fileName);
-                            if (result.isPresent()) {
-                                String newFileName = result.get();
-                                out.writeByte(byteOfOperation);
-                                out.writeInt(2);
-                                logger.info("Need to rename: " + fileName);
-
-                                byte[] stringBytes;
-                                out.writeInt(fileName.length());
-                                stringBytes = fileName.getBytes(StandardCharsets.UTF_8);
-                                out.write(stringBytes);
-
-                                out.writeInt(newFileName.length());
-                                stringBytes = newFileName.getBytes(StandardCharsets.UTF_8);
-                                out.write(stringBytes);
-                                logger.info("Rename send to server");
-
-                                waitByteOfConfirm();
-                            }
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    } else {
-                        showAlert("Warning", "Can't rename many files!", "Select one file and try again");
-                    }
-                } else {
-                    logger.info("Send list of need to server");
-                    try {
-                        logger.info("Byte: " + byteOfOperation);
-                        out.writeByte(byteOfOperation);
-                        logger.info("Count: " + countSelectedItems);
-                        out.writeInt(countSelectedItems);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                    tableViewServer.getSelectionModel().getSelectedItems().forEach(tableData -> {
-                        String fileName = tableData.getFileName();
-                        logger.info("Need: " + fileName);
-                        try {
-                            out.writeInt(fileName.length());
-                            byte[] stringBytes = fileName.getBytes(StandardCharsets.UTF_8);
-                            out.write(stringBytes);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    });
-                    logger.info("Operation send to server");
-
-                    if (byteOfOperation == Bytes.BYTE_OF_DELETE_FILE.toByte()) {
-                        waitByteOfConfirm();
-                    } else {
-                        while (true) {
-                            logger.info("Byte wait");
-                            byte b = in.nextByte();
-                            logger.info("Byte: " + b);
-                            if (b == Bytes.BYTE_OF_END_OF_SEND_FROM_SERVER.toByte()) {
-                                break;
-                            }
-                            if (b == Bytes.BYTE_OF_CATALOG_LEVEL_UP.toByte()) {
-                                folderLevelUp();
-                            } else if (b == Bytes.BYTE_OF_SEND_CATALOG_FROM_SERVER.toByte()) {
-                                logger.info("Catalog");
-                                String fileName = in.next();
-                                currentFolderClientFilesName += fileName;
-                                File file = new File(currentFolderClientFilesName);
-                                //noinspection ResultOfMethodCallIgnored
-                                file.mkdir();
-                                logger.info("Byte of enter catalog");
-
-                            } else if (b == Bytes.BYTE_OF_SEND_FILE_FROM_SERVER.toByte()) {
-                                logger.info("File");
-                                getFile();
-
-                                //Т.к я использую для команд Scanner, а для файлов BufferedInputStream
-                                //Тут приходится переключаться обратно для получения команд
-                                //Без задержки в хендлере сервера (отметил как todo), выдает ошибку в 576 строке
-                                //Caused by: java.util.InputMismatchException
-                                //Т.е мне кажется, что он там получает байт не как для Scanner, а как для BufferedInputStream
-                                //Поэтому если добавить задержку, то проблема уходит, т.к успевает переключиться
-                                try {
-                                    in = new Scanner(socket.getInputStream());
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                }
-                            } else {
-                                logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
-                            }
-                        }
-                        logger.info("Files gets from server");
-                    }
-                }
-            }
-        }
+    private void sendListToGetOrDeleteFromServer(byte byteOfOperation) throws IOException {
+//        ObservableList<TableData> selectedItemsServerFiles = tableViewServer.getSelectionModel().getSelectedItems();
+//        int countSelectedItems = selectedItemsServerFiles.size();
+//        if (countSelectedItems != 0) {
+//            boolean incorrectChoice = false;
+//            for (TableData selectedItem : selectedItemsServerFiles) {
+//                if (selectedItem.getFileName().equals("./")){
+//                    incorrectChoice = true;
+//                    break;
+//                }
+//            }
+//            if (incorrectChoice){
+//                showAlert("Error!", "You can't selected './' to operation!", "Choose again");
+//            } else {
+//                if (byteOfOperation == Bytes.BYTE_OF_RENAME_FILE.toByte()) {
+//                    if (countSelectedItems == 1) {
+//                        try {
+//                            String fileName = tableViewServer.getSelectionModel().getSelectedItem().getFileName();
+//
+//                            Optional<String> result = setNewFileName(fileName);
+//                            if (result.isPresent()) {
+//                                String newFileName = result.get();
+//                                out.writeByte(byteOfOperation);
+//                                out.writeInt(2);
+//                                logger.info("Need to rename: " + fileName);
+//
+//                                byte[] stringBytes;
+//                                out.writeInt(fileName.length());
+//                                stringBytes = fileName.getBytes(StandardCharsets.UTF_8);
+//                                out.write(stringBytes);
+//
+//                                out.writeInt(newFileName.length());
+//                                stringBytes = newFileName.getBytes(StandardCharsets.UTF_8);
+//                                out.write(stringBytes);
+//                                logger.info("Rename send to server");
+//
+//                                waitByteOfConfirm();
+//                            }
+//                        } catch (IOException e) {
+//                            e.printStackTrace();
+//                        }
+//                    } else {
+//                        showAlert("Warning", "Can't rename many files!", "Select one file and try again");
+//                    }
+//                } else {
+//                    logger.info("Send list of need to server");
+//                    try {
+//                        logger.info("Byte: " + byteOfOperation);
+//                        out.writeByte(byteOfOperation);
+//                        logger.info("Count: " + countSelectedItems);
+//                        out.writeInt(countSelectedItems);
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                    }
+//
+//                    tableViewServer.getSelectionModel().getSelectedItems().forEach(tableData -> {
+//                        String fileName = tableData.getFileName();
+//                        logger.info("Need: " + fileName);
+//                        try {
+//                            out.writeInt(fileName.length());
+//                            byte[] stringBytes = fileName.getBytes(StandardCharsets.UTF_8);
+//                            out.write(stringBytes);
+//                        } catch (IOException e) {
+//                            e.printStackTrace();
+//                        }
+//                    });
+//                    logger.info("Operation send to server");
+//
+//                    if (byteOfOperation == Bytes.BYTE_OF_DELETE_FILE.toByte()) {
+//                        waitByteOfConfirm();
+//                    } else {
+//                        while (true) {
+//                            logger.info("Byte wait");
+//                            byte b = in.readByte();
+//                            logger.info("Byte: " + b);
+//                            if (b == Bytes.BYTE_OF_END_OF_SEND_FROM_SERVER.toByte()) {
+//                                break;
+//                            }
+//                            if (b == Bytes.BYTE_OF_CATALOG_LEVEL_UP.toByte()) {
+//                                folderLevelUp();
+//                            } else if (b == Bytes.BYTE_OF_SEND_CATALOG_FROM_SERVER.toByte()) {
+//                                logger.info("Catalog");
+//                                String fileName = in.readUTF();
+//                                currentFolderClientFilesName += fileName;
+//                                File file = new File(currentFolderClientFilesName);
+//                                //noinspection ResultOfMethodCallIgnored
+//                                file.mkdir();
+//                                logger.info("Byte of enter catalog");
+//
+//                            } else if (b == Bytes.BYTE_OF_SEND_FILE_FROM_SERVER.toByte()) {
+//                                logger.info("File");
+//                                getFile();
+//                            } else {
+//                                logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
+//                            }
+//                        }
+//                        logger.info("Files gets from server");
+//                    }
+//                }
+//            }
+//        }
     }
 
     private void folderLevelUp() {
@@ -620,48 +629,48 @@ public class Controller implements Initializable, Closeable {
         logger.info("Folder level up");
     }
 
-    private void waitByteOfConfirm() {
-        logger.info("Byte wait");
-        byte b = in.nextByte();
-        logger.info("Byte: " + b);
-        if (b != Bytes.BYTE_OF_CONFIRM.toByte()) {
-            logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
-        }
+    private void waitByteOfConfirm() throws IOException {
+//        logger.info("Byte wait");
+//        byte b = in.readByte();
+//        logger.info("Byte: " + b);
+//        if (b != Bytes.BYTE_OF_CONFIRM.toByte()) {
+//            logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
+//        }
     }
 
-    private void getFile() {
-        String fileName = in.next();
-        logger.info("File name: " + fileName);
-        String sizeFileName = in.next();
-        long sizeFile = Long.parseLong(sizeFileName);
-        logger.info("Size file: " + sizeFile);
-
-        try {
-            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(currentFolderClientFilesName + fileName));
-            BufferedInputStream bis = new BufferedInputStream(socket.getInputStream());
-
-            if (sizeFile != 0) {
-                while (true) {
-                    if (sizeFile > bytes.length) {
-                        sizeFile -= bytes.length;
-                        //noinspection ResultOfMethodCallIgnored
-                        bis.read(bytes);
-                        bos.write(bytes);
-                    } else {
-                        //noinspection ResultOfMethodCallIgnored
-                        bis.read(bytes, 0, (int) sizeFile);
-                        bos.write(bytes, 0, (int) sizeFile);
-                        break;
-                    }
-                }
-                logger.info("File received");
-            } else {
-                logger.info("File is clear");
-            }
-            bos.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    private void getFile() throws IOException {
+//        String fileName = in.readUTF();
+//        logger.info("File name: " + fileName);
+//        String sizeFileName = in.readUTF();
+//        long sizeFile = Long.parseLong(sizeFileName);
+//        logger.info("Size file: " + sizeFile);
+//
+//        try {
+//            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(currentFolderClientFilesName + fileName));
+//            BufferedInputStream bis = new BufferedInputStream(in);
+//
+//            if (sizeFile != 0) {
+//                while (true) {
+//                    if (sizeFile > bytes.length) {
+//                        sizeFile -= bytes.length;
+//                        //noinspection ResultOfMethodCallIgnored
+//                        bis.read(bytes);
+//                        bos.write(bytes);
+//                    } else {
+//                        //noinspection ResultOfMethodCallIgnored
+//                        bis.read(bytes, 0, (int) sizeFile);
+//                        bos.write(bytes, 0, (int) sizeFile);
+//                        break;
+//                    }
+//                }
+//                logger.info("File received");
+//            } else {
+//                logger.info("File is clear");
+//            }
+//            bos.close();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
     }
 
     @FXML
@@ -694,40 +703,40 @@ public class Controller implements Initializable, Closeable {
 
     @FXML
     public void mouseClickedTableViewServerFiles(MouseEvent mouseEvent) throws IOException {
-        if(mouseEvent.getClickCount() == 2){
-            System.out.println("Double clicked");
-            String enteredFolder = tableViewServer.getSelectionModel().getSelectedItem().getFileName();
-            logger.info("Entered Folder: " + enteredFolder);
-            if (enteredFolder.endsWith(File.separator)){
-                out.writeByte(Bytes.BYTE_OF_ENTER_CATALOG.toByte());
-                out.writeInt(1);
-
-                out.writeInt(enteredFolder.length());
-                byte[] stringBytes = enteredFolder.getBytes(StandardCharsets.UTF_8);
-                out.write(stringBytes);
-
-                logger.info("Byte wait");
-                byte b = in.nextByte();
-                logger.info("Byte: " + b);
-                if (b == Bytes.BYTE_OF_CONFIRM.toByte()){
-                    refreshListOfServerFiles();
-                } else {
-                    logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
-                }
-            }
-        }
-        tableViewClient.getSelectionModel().clearSelection();
-        if (tableViewServer.getItems().get(0).getFileName().equals("Empty")){
-            tableViewServer.getSelectionModel().clearSelection();
-            setButtonsCaptureClear();
-        } else {
-            buttonSelectAll.setText("Select all ->");
-            buttonCopy.setText("<- Copy to");
-            buttonMove.setText("<- Move to");
-            buttonDelete.setText("Delete ->");
-            buttonRename.setText("Rename ->");
-            selected = Selected.RIGHT;
-        }
+//        if(mouseEvent.getClickCount() == 2){
+//            System.out.println("Double clicked");
+//            String enteredFolder = tableViewServer.getSelectionModel().getSelectedItem().getFileName();
+//            logger.info("Entered Folder: " + enteredFolder);
+//            if (enteredFolder.endsWith(File.separator)){
+//                out.writeByte(Bytes.BYTE_OF_ENTER_CATALOG.toByte());
+//                out.writeInt(1);
+//
+//                out.writeInt(enteredFolder.length());
+//                byte[] stringBytes = enteredFolder.getBytes(StandardCharsets.UTF_8);
+//                out.write(stringBytes);
+//
+//                logger.info("Byte wait");
+//                byte b = in.readByte();
+//                logger.info("Byte: " + b);
+//                if (b == Bytes.BYTE_OF_CONFIRM.toByte()){
+//                    refreshListOfServerFiles();
+//                } else {
+//                    logger.info("Error in inner byte!!!!!!!!!!!!!!!!!!!!");
+//                }
+//            }
+//        }
+//        tableViewClient.getSelectionModel().clearSelection();
+//        if (tableViewServer.getItems().get(0).getFileName().equals("Empty")){
+//            tableViewServer.getSelectionModel().clearSelection();
+//            setButtonsCaptureClear();
+//        } else {
+//            buttonSelectAll.setText("Select all ->");
+//            buttonCopy.setText("<- Copy to");
+//            buttonMove.setText("<- Move to");
+//            buttonDelete.setText("Delete ->");
+//            buttonRename.setText("Rename ->");
+//            selected = Selected.RIGHT;
+//        }
     }
 
     private void setListsViewClear() {
@@ -762,13 +771,18 @@ public class Controller implements Initializable, Closeable {
     }
 
     @FXML
-    public void pressButtonSignUpAdd() {
+    public void pressButtonSignUpAdd() throws InterruptedException {
         String login = loginFieldAdd.getText();
         String password = passFieldAdd.getText();
         if ((login.equals("") || password.equals(""))){
             showAlert("Error!", "Login or password is empty!", "Enter you login and password");
         } else {
-            connectToServer("AddNewUser", login, password);
+            try{
+                connect();
+                connectToServer("AddNewUser", login, password);
+            } catch (InterruptedException | IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -787,24 +801,31 @@ public class Controller implements Initializable, Closeable {
         if ((login.equals("") || password.equals(""))){
             showAlert("Error!", "Login or password is empty!", "Enter you login and password");
         } else {
-            connectToServer("Auth", login, password);
+            try {
+                connect();
+                connectToServer("Auth", login, password);
+            } catch (InterruptedException | IOException e) {
+                e.printStackTrace();
+            }
         }
+    }
+
+    private void connect() throws InterruptedException {
+        CountDownLatch networkStarter = new CountDownLatch(1);
+        new Thread(() -> Network.getInstance().start(networkStarter, this::callback)).start();
+        networkStarter.await();
+        this.channel = Network.getInstance().getCurrentChannel();
+
+        logger.info("Network start...");
     }
 
     public void handleExitAction() {
-        close();
+        closeConnection();
         Platform.exit();
     }
 
-    @Override
-    public void close() {
-        try {
-            in.close();
-            out.close();
-            socket.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    public void closeConnection() {
+        Network.getInstance().stop();
     }
 
     @FXML
